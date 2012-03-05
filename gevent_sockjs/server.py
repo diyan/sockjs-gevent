@@ -6,7 +6,7 @@ from gevent.pywsgi import WSGIServer
 
 class SockJSServer(WSGIServer):
     """
-    The base SockJS server, subclases gevent.pywsgi.WSGIServer
+    The base SockJS server, subclasses gevent.pywsgi.WSGIServer
     """
 
     session_backend = session.MemorySession
@@ -62,5 +62,5 @@ class SockJSServer(WSGIServer):
         Shutdown the server, block to inform the sessions that
         they are closing.
         """
-        self.session_pool.shudown()
+        self.session_pool.shutdown()
         super(SockJSServer, self).kill()
