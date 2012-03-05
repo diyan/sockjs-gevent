@@ -47,7 +47,7 @@ def devel_server():
     """
 
     try:
-        sockjs = SockJSServer(('',8081), router, trace=True)
+        sockjs = SockJSServer(('localhost',8081), router, trace=True)
         sockjs.serve_forever()
     except KeyboardInterrupt:
         sockjs.kill()
