@@ -1,3 +1,4 @@
 gevent==0.13.6
+simplejson==2.3.3
 # gevent-websocket 0.3.0-dev, has a ton of fixes
 https://bitbucket.org/Jeffrey/gevent-websocket/get/b3c0cd806af0.zip

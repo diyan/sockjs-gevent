@@ -1,5 +1,5 @@
 nose==1.1.2
-Werkzeug==0.8.2
-
-# See https://github.com/Lawouach/WebSocket-for-Python/issues/16
-https://github.com/Lawouach/WebSocket-for-Python/issues/16
+websocket==0.2.1
+Werkzeug==0.8.3
+ws4py==0.2.0
+unitttest2==0.5.1
