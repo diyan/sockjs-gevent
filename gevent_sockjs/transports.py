@@ -264,41 +264,10 @@ class XHRStreaming(PollingTransport):
     direction = 'recv'
 
     TIMING = 2
-    CUTOFF = 10240
+    # THIS NUMBER MAY NOT BE RIGHT. DEEP MAGIC.
+    response_limit = 4224
 
     prelude = 'h' *  2048 + '\n'
-
-    def poll(self, handler):
-        """
-        Spin lock the thread until we have a message on the
-        gevent queue.
-        """
-
-        writer = handler.socket.makefile()
-        written = 0
-
-        try:
-            while True:
-                messages = self.session.get_messages(timeout=self.TIMING)
-                messages = self.encode(messages)
-
-                frame = protocol.message_frame(messages) + '\n'
-                chunk = handler.raw_chunk(frame)
-
-                writer.write(chunk)
-                writer.flush()
-                written += len(chunk)
-
-                zero_chunk = handler.raw_chunk('')
-                writer.write(zero_chunk)
-
-                if written > self.CUTOFF:
-                    zero_chunk = handler.raw_chunk('')
-                    writer.write(zero_chunk)
-                    break
-
-        except socket.error:
-            self.session.expire()
 
     def stream(self, handler):
         content_type = ("Content-Type", "application/javascript; charset=UTF-8")
@@ -331,6 +300,8 @@ class XHRStreaming(PollingTransport):
 
         try:
             writer = handler.socket.makefile()
+            written = 0
+
             writer.write(headers)
             writer.flush()
 
@@ -341,10 +312,23 @@ class XHRStreaming(PollingTransport):
             writer.write(open_chunk)
 
             writer.flush()
-            writer.close()
+
+            while written < self.response_limit:
+                messages = self.session.get_messages(timeout=self.TIMING)
+                messages = self.encode(messages)
+
+                frame = protocol.message_frame(messages) + '\n'
+                chunk = handler.raw_chunk(frame)
+
+                writer.write(chunk)
+                writer.flush()
+                written += len(chunk)
 
         except socket.error:
             self.session.expire()
+
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
 
     def __call__(self, handler, request_method, raw_request_data):
         """
@@ -355,7 +339,6 @@ class XHRStreaming(PollingTransport):
 
         return [
             gevent.spawn(self.stream, handler),
-            gevent.spawn(self.poll, handler),
         ]
 
 def pad(s):
