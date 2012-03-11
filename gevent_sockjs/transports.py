@@ -2,6 +2,7 @@ import socket
 import gevent
 import urllib2
 import urlparse
+import simplejson as json
 from socket import error as socketerror
 
 import protocol
@@ -343,8 +344,79 @@ class XHRStreaming(PollingTransport):
             gevent.spawn(self.poll, handler),
         ]
 
+def pad(s):
+    return s + ' ' * (1024 - len(s) + 14)
+
 class HTMLFile(BaseTransport):
     direction = 'recv'
+
+    def write_frame(self, data):
+        pass
+
+    def stream(self, handler):
+        try:
+            callback_param = handler.environ.get("QUERY_STRING").split('=')[1]
+            self.callback = urllib2.unquote(callback_param)
+        except IndexError:
+            handler.do500(message='"callback" parameter required')
+            return
+
+        # Turn on cookie, turn off caching, set headers
+        handler.enable_cookie()
+        handler.enable_nocache()
+        handler.headers += [
+            ("Content-Type", "text/html; charset=UTF-8"),
+            ("Transfer-Encoding", "chunked"),
+            ('Connection', 'keep-alive'),
+        ]
+
+        # Start writing
+        handler.start_response("200 OK", handler.headers)
+        headers = handler.raw_headers()
+        writer = handler.socket.makefile()
+        writer.write(headers)
+        written = 0
+
+        # Send down HTMLFile IFRAME
+        html = protocol.HTMLFILE_IFRAME_HTML % self.callback
+        html = pad(html)
+
+        chunk = handler.raw_chunk(html)
+
+        writer.write(chunk)
+        writer.flush()
+        written += len(chunk)
+
+        chunk = '<script>\np("o");\n</script>\r\n'
+        chunk = handler.raw_chunk(chunk)
+        writer.write(chunk)
+        writer.flush()
+        written += len(chunk)
+
+        try:
+            while True:
+                messages = self.session.get_messages(timeout=5)
+                messages = self.encode(messages)
+
+                frame = protocol.message_frame(messages)
+                frame = json.dumps(frame)
+
+                chunk = '<script>\np(%s);\n</script>\r\n' % frame
+                chunk = handler.raw_chunk(chunk)
+                writer.write(chunk)
+                writer.flush()
+                written += len(chunk)
+        except socket.error:
+            self.session.expire()
+
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
+        writer.close()
+
+    def __call__(self, handler, request_method, raw_request_data):
+        return [
+            gevent.spawn(self.stream, handler),
+        ]
 
 class IFrame(BaseTransport):
     direction = 'recv'
