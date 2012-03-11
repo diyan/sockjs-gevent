@@ -363,6 +363,7 @@ def pad(s):
 
 class HTMLFile(BaseTransport):
     direction = 'recv'
+    response_limit = 4096
 
     def write_frame(self, data):
         pass
@@ -408,7 +409,7 @@ class HTMLFile(BaseTransport):
         written += len(chunk)
 
         try:
-            while True:
+            while written < self.response_limit:
                 messages = self.session.get_messages(timeout=5)
                 messages = self.encode(messages)
 
