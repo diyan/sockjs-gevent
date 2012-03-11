@@ -103,7 +103,9 @@ class JSONPSend(BaseTransport):
                 payload = qs['d']
             else:
                 using_formdata = False
-                payload = urllib2.unquote(raw_request_data)
+                payload = raw_request_data
+
+        # todo: more granular exception catching
         except Exception as e:
             handler.do500(message='Payload expected.')
             return
@@ -178,12 +180,20 @@ class PollingTransport(BaseTransport):
             handler.enable_cors()
             handler.write_js(protocol.OPEN)
             return []
+
+        elif self.session.is_network_error():
+            interrupt_error = protocol.close_frame(1002, "Connection interrupted")
+            handler.write_text(interrupt_error)
+            return []
+
         elif self.session.is_expired():
             close_error = protocol.close_frame(3000, "Go away!")
             handler.write_text(close_error)
             return []
+
         elif self.session.is_locked():
             lock_error = protocol.close_frame(2010, "Another connection still open")
+            self.session.network_error = True
             handler.write_text(lock_error)
             return []
         else:
@@ -339,6 +349,10 @@ class XHRStreaming(PollingTransport):
     def __call__(self, handler, request_method, raw_request_data):
         """
         """
+        if request_method == 'OPTIONS':
+            handler.write_options(['OPTIONS', 'POST'])
+            return []
+
         return [
             gevent.spawn(self.stream, handler),
             gevent.spawn(self.poll, handler),
@@ -423,6 +437,12 @@ class IFrame(BaseTransport):
 
 class EventSource(BaseTransport):
     direction = 'send'
+
+# Socket Transports
+# ==================
+#
+# Provides a bidirectional connection to and from the client.
+# Sending and receiving are split in two different threads.
 
 class WebSocket(BaseTransport):
     direction = 'bi'
@@ -526,7 +546,13 @@ class RawWebSocket(BaseTransport):
             messages = self.session.get_messages()
 
             for message in messages:
-                socket.send(message)
+                # TODO: this is a hack because the rest of the
+                # transports actually use framing and this is the
+                # one abberation. But it works...
+                if len(message) == 1:
+                    socket.send(message[0])
+                else:
+                    socket.send(message)
 
         socket.close()
 

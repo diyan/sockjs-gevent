@@ -23,6 +23,8 @@ from utils import WebSocket8Client
 import uuid
 import nose
 
+from nose.tools import timed
+
 # Base URL
 # ========
 
@@ -483,6 +485,7 @@ class Protocol(Test):
 # WebSocket protocols: `/*/*/websocket`
 # -------------------------------------
 import websocket
+websocket.setdefaulttimeout(5)
 
 # The most important feature of SockJS is to support native WebSocket
 # protocol. A decent SockJS server should support at least the
@@ -626,6 +629,7 @@ class WebsocketHixie76(Test):
 
     # When user sends broken data - broken JSON for example, the
     # server must terminate the ws connection.
+    @timed(1)
     def test_broken_json(self):
         ws_url = 'ws:' + base_url.split(':',1)[1] + \
                  '/000/' + str(uuid.uuid4()) + '/websocket'
