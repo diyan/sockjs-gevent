@@ -54,7 +54,7 @@ class Session(object):
             self.forever = True
             return
 
-        # Slide the expirtaion time one more expiration interval
+        # Slide the expiration time one more expiration interval
         # into the future
         if extension is None:
             self.expires_at = datetime.now() + self.expires

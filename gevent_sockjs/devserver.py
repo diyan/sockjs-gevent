@@ -12,14 +12,13 @@ suite.
 
 import gevent.monkey
 
-# Moneky patching stdlib is not a neccesity for all use cases
+# Monkey patching stdlib is not a necessity for all use cases
 gevent.monkey.patch_all()
 
 from server import SockJSServer
 from router import SockJSRouter, SockJSConnection
 
-# Need to moneky patch the threading module to
-# use greenlets
+# Need to moneky patch the threading module to use greenlets
 import werkzeug.serving
 
 class Echo(SockJSConnection):

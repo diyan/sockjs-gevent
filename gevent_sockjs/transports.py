@@ -305,6 +305,7 @@ class XHRStreaming(PollingTransport):
             writer.write(headers)
             writer.flush()
 
+            # Should the lengths of these be added to `written`?
             prelude_chunk = handler.raw_chunk(self.prelude)
             open_chunk = handler.raw_chunk('o\n')
 
