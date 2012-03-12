@@ -121,10 +121,8 @@ class MemorySession(Session):
     store.
     """
 
-    timer = 10.0
-
     def __init__(self, server, session_id=None):
-        super(MemorySession, self).__init__(server, session_id)
+        super(MemorySession, self).__init__(server, session_id=session_id)
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.server = server
 

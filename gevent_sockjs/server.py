@@ -50,7 +50,7 @@ class SockJSServer(WSGIServer):
         # Otherwise let the client choose their session_id, if
         # this transport direction allows
         if create_if_null and session is None:
-            session = self.session_backend(self, session_id)
+            session = self.session_backend(self, session_id=session_id)
             self.session_pool.add(session)
         elif session:
             session.incr_hits()
