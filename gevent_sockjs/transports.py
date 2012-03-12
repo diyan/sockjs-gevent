@@ -268,26 +268,23 @@ class XHRStreaming(PollingTransport):
     response_limit = 4224
 
     prelude = 'h' *  2048 + '\n'
+    content_type = ("Content-Type", "application/javascript; charset=UTF-8")
 
-    def stream(self, handler):
-        content_type = ("Content-Type", "application/javascript; charset=UTF-8")
-
+    def write_prelude(self, handler):
         handler.enable_cookie()
         handler.enable_cors()
 
         # https://groups.google.com/forum/#!msg/sockjs/bl3af2zqc0A/w-o3OK3LKi8J
         if handler.request_version == 'HTTP/1.1':
-
             handler.headers += [
-                content_type,
+                self.content_type,
                 ("Transfer-Encoding", "chunked"),
                 ('Connection', 'keep-alive'),
             ]
 
         elif handler.request_version == 'HTTP/1.0':
-
             handler.headers += [
-                content_type,
+                self.content_type,
                 ('Connection', 'close'),
             ]
 
@@ -305,11 +302,23 @@ class XHRStreaming(PollingTransport):
             writer.write(headers)
             writer.flush()
 
-            # Should the lengths of these be added to `written`?
+            # Should the length of this be added to `written`?
             prelude_chunk = handler.raw_chunk(self.prelude)
-            open_chunk = handler.raw_chunk('o\n')
-
             writer.write(prelude_chunk)
+
+            writer.flush()
+
+        except socket.error:
+            self.session.expire()
+
+        return (writer, written)
+
+
+    def stream(self, handler):
+        writer, written = self.write_prelude(handler)
+        try:
+            # Should the length of this be added to `written`?
+            open_chunk = handler.raw_chunk('o\n')
             writer.write(open_chunk)
 
             writer.flush()
@@ -330,6 +339,7 @@ class XHRStreaming(PollingTransport):
 
         zero_chunk = handler.raw_chunk('')
         writer.write(zero_chunk)
+        self.session.unlock()
 
     def __call__(self, handler, request_method, raw_request_data):
         """
@@ -337,7 +347,43 @@ class XHRStreaming(PollingTransport):
         if request_method == 'OPTIONS':
             handler.write_options(['OPTIONS', 'POST'])
             return []
+        elif self.session.is_network_error():
+            writer, written = self.write_prelude(handler)
 
+            try:
+                interrupt_error = protocol.close_frame(1002, "Connection interrupted")
+                interrupt_error_chunk = handler.raw_chunk(interrupt_error)
+
+                writer.write(interrupt_error_chunk)
+                writer.flush()
+
+            except socket.error:
+                self.session.expire()
+
+            zero_chunk = handler.raw_chunk('')
+            writer.write(zero_chunk)
+            self.session.network_error = True
+            return []
+
+        elif self.session.is_locked():
+            writer, written = self.write_prelude(handler)
+
+            try:
+                close_error = protocol.close_frame(2010, "Another connection still open")
+                close_error_chunk = handler.raw_chunk(close_error)
+
+                writer.write(close_error_chunk)
+                writer.flush()
+
+            except socket.error:
+                self.session.expire()
+
+            zero_chunk = handler.raw_chunk('')
+            writer.write(zero_chunk)
+            self.session.network_error = True
+            return []
+
+        self.session.lock()
         return [
             gevent.spawn(self.stream, handler),
         ]
