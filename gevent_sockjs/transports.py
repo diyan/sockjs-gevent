@@ -470,7 +470,7 @@ class EventSource(BaseTransport):
     direction = 'recv'
 
     TIMING = 5.0
-    response_limit = 128 * 1024
+    response_limit = 4096
 
     def encode(self, data):
         # TODO: Not using protocol.encode because it doesn't escape
@@ -485,7 +485,7 @@ class EventSource(BaseTransport):
         else:
             raise ValueError("Unable to serialize: %s", str(data))
 
-        return "data: %s\r\n\r\n" % protocol.message_frame(data)
+        return protocol.message_frame(data)
 
     def stream(self, handler):
         handler.enable_cookie()
@@ -499,10 +499,24 @@ class EventSource(BaseTransport):
         if self.session.is_new():
             write("data: o\r\n\r\n")
 
-        while True:
-            messages = self.session.get_messages()
-            messages = self.encode(messages)
+        written = 0
+
+        while written < self.response_limit:
+            messages = self.session.get_messages(timeout=self.TIMING)
+
+            if messages:
+                messages = self.encode(messages)
+            else:
+                messages = protocol.HEARTBEAT
+
+            messages = "data: %s\r\n\r\n" % messages
+
             write(messages)
+            written += len(messages)
+
+        writer = handler.socket.makefile()
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
 
     def __call__(self, handler, request_method, raw_request_data):
 

@@ -136,6 +136,8 @@ class MemorySession(Session):
         self.queue.put_nowait(msg)
 
     def get_messages(self, **kwargs):
+        timeout = kwargs.get('timeout', None)
+
         self.incr_hits()
 
         if self.queue.empty():
@@ -147,7 +149,10 @@ class MemorySession(Session):
             accum = []
             try:
                 while not self.queue.empty():
-                    accum.append(self.queue.get_nowait())
+                    if timeout:
+                        accum.append(self.queue.get(timeout=timeout))
+                    else:
+                        accum.append(self.queue.get_nowait())
             finally:
                 return accum
 
