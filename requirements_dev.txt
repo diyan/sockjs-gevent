@@ -1,5 +1,6 @@
 nose==1.1.2
+Sphinx==1.1.3
 websocket==0.2.1
 Werkzeug==0.8.3
 ws4py==0.2.0
-unitttest2==0.5.1
+unittest2==0.5.1
