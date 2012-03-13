@@ -467,7 +467,49 @@ class IFrame(BaseTransport):
     direction = 'recv'
 
 class EventSource(BaseTransport):
-    direction = 'send'
+    direction = 'recv'
+
+    TIMING = 5.0
+    response_limit = 128 * 1024
+
+    def encode(self, data):
+        # TODO: Not using protocol.encode because it doesn't escape
+        # things properly here. The other version should be fixed at
+        # some point to avoid duplication.
+        data = json.dumps(data, separators=(',', ':'))
+        if isinstance(data, basestring):
+            # Don't both calling json, since its simple
+            data = '[' + data + ']'
+        elif isinstance(data, (object, dict, list)):
+            data = json.dumps(data, separators=(',',':'))
+        else:
+            raise ValueError("Unable to serialize: %s", str(data))
+
+        return "data: %s\r\n\r\n" % protocol.message_frame(data)
+
+    def stream(self, handler):
+        handler.enable_cookie()
+        handler.enable_nocache()
+        handler.headers += [
+            ("Content-Type", "text/event-stream; charset=UTF-8"),
+        ]
+
+        write = handler.start_response("200 OK", handler.headers)
+        write("\r\n")
+        if self.session.is_new():
+            write("data: o\r\n\r\n")
+
+        while True:
+            messages = self.session.get_messages()
+            messages = self.encode(messages)
+            write(messages)
+
+    def __call__(self, handler, request_method, raw_request_data):
+
+        return [
+            gevent.spawn(self.stream, handler),
+        ]
+
 
 # Socket Transports
 # ==================
