@@ -2,12 +2,13 @@ import socket
 import gevent
 import urllib2
 import urlparse
+import simplejson as json
 from socket import error as socketerror
 
 import protocol
 from errors import *
 
-from geventwebsocket.websocket import Closed, WebSocketError
+from geventwebsocket.websocket import WebSocketError
 
 class BaseTransport(object):
 
@@ -263,61 +264,27 @@ class XHRStreaming(PollingTransport):
     direction = 'recv'
 
     TIMING = 2
-    CUTOFF = 10240
+    # THIS NUMBER MAY NOT BE RIGHT. DEEP MAGIC.
+    response_limit = 4224
 
     prelude = 'h' *  2048 + '\n'
+    content_type = ("Content-Type", "application/javascript; charset=UTF-8")
 
-    def poll(self, handler):
-        """
-        Spin lock the thread until we have a message on the
-        gevent queue.
-        """
-
-        writer = handler.socket.makefile()
-        written = 0
-
-        try:
-            while True:
-                messages = self.session.get_messages(timeout=self.TIMING)
-                messages = self.encode(messages)
-
-                frame = protocol.message_frame(messages) + '\n'
-                chunk = handler.raw_chunk(frame)
-
-                writer.write(chunk)
-                writer.flush()
-                written += len(chunk)
-
-                zero_chunk = handler.raw_chunk('')
-                writer.write(zero_chunk)
-
-                if written > self.CUTOFF:
-                    zero_chunk = handler.raw_chunk('')
-                    writer.write(zero_chunk)
-                    break
-
-        except socket.error:
-            self.session.expire()
-
-    def stream(self, handler):
-        content_type = ("Content-Type", "application/javascript; charset=UTF-8")
-
+    def write_prelude(self, handler):
         handler.enable_cookie()
         handler.enable_cors()
 
         # https://groups.google.com/forum/#!msg/sockjs/bl3af2zqc0A/w-o3OK3LKi8J
         if handler.request_version == 'HTTP/1.1':
-
             handler.headers += [
-                content_type,
+                self.content_type,
                 ("Transfer-Encoding", "chunked"),
                 ('Connection', 'keep-alive'),
             ]
 
         elif handler.request_version == 'HTTP/1.0':
-
             handler.headers += [
-                content_type,
+                self.content_type,
                 ('Connection', 'close'),
             ]
 
@@ -330,20 +297,46 @@ class XHRStreaming(PollingTransport):
 
         try:
             writer = handler.socket.makefile()
+            written = 0
+
             writer.write(headers)
             writer.flush()
 
             prelude_chunk = handler.raw_chunk(self.prelude)
-            open_chunk = handler.raw_chunk('o\n')
-
             writer.write(prelude_chunk)
-            writer.write(open_chunk)
 
             writer.flush()
-            writer.close()
 
         except socket.error:
             self.session.expire()
+
+        return (writer, written)
+
+
+    def stream(self, handler):
+        writer, written = self.write_prelude(handler)
+        try:
+            open_chunk = handler.raw_chunk('o\n')
+            writer.write(open_chunk)
+            writer.flush()
+
+            while written < self.response_limit:
+                messages = self.session.get_messages(timeout=self.TIMING)
+                messages = self.encode(messages)
+
+                frame = protocol.message_frame(messages) + '\n'
+                chunk = handler.raw_chunk(frame)
+
+                writer.write(chunk)
+                writer.flush()
+                written += len(chunk)
+
+        except socket.error:
+            self.session.expire()
+
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
+        self.session.unlock()
 
     def __call__(self, handler, request_method, raw_request_data):
         """
@@ -351,20 +344,183 @@ class XHRStreaming(PollingTransport):
         if request_method == 'OPTIONS':
             handler.write_options(['OPTIONS', 'POST'])
             return []
+        elif self.session.is_network_error():
+            writer, written = self.write_prelude(handler)
 
+            try:
+                interrupt_error = protocol.close_frame(1002, "Connection interrupted")
+                interrupt_error_chunk = handler.raw_chunk(interrupt_error)
+
+                writer.write(interrupt_error_chunk)
+                writer.flush()
+
+            except socket.error:
+                self.session.expire()
+
+            zero_chunk = handler.raw_chunk('')
+            writer.write(zero_chunk)
+            self.session.network_error = True
+            return []
+
+        elif self.session.is_locked():
+            writer, written = self.write_prelude(handler)
+
+            try:
+                close_error = protocol.close_frame(2010, "Another connection still open")
+                close_error_chunk = handler.raw_chunk(close_error)
+
+                writer.write(close_error_chunk)
+                writer.flush()
+
+            except socket.error:
+                self.session.expire()
+
+            zero_chunk = handler.raw_chunk('')
+            writer.write(zero_chunk)
+            self.session.network_error = True
+            return []
+
+        self.session.lock()
         return [
             gevent.spawn(self.stream, handler),
-            gevent.spawn(self.poll, handler),
         ]
+
+def pad(s):
+    return s + ' ' * (1024 - len(s) + 14)
 
 class HTMLFile(BaseTransport):
     direction = 'recv'
+    response_limit = 4096
+
+    def write_frame(self, data):
+        pass
+
+    def stream(self, handler):
+        try:
+            callback_param = handler.environ.get("QUERY_STRING").split('=')[1]
+            self.callback = urllib2.unquote(callback_param)
+        except IndexError:
+            handler.do500(message='"callback" parameter required')
+            return
+
+        # Turn on cookie, turn off caching, set headers
+        handler.enable_cookie()
+        handler.enable_nocache()
+        handler.headers += [
+            ("Content-Type", "text/html; charset=UTF-8"),
+            ("Transfer-Encoding", "chunked"),
+            ('Connection', 'keep-alive'),
+        ]
+
+        # Start writing
+        handler.start_response("200 OK", handler.headers)
+        headers = handler.raw_headers()
+        writer = handler.socket.makefile()
+        writer.write(headers)
+        written = 0
+
+        # Send down HTMLFile IFRAME
+        html = protocol.HTMLFILE_IFRAME_HTML % self.callback
+        html = pad(html)
+
+        chunk = handler.raw_chunk(html)
+
+        writer.write(chunk)
+        writer.flush()
+        written += len(chunk)
+
+        chunk = '<script>\np("o");\n</script>\r\n'
+        chunk = handler.raw_chunk(chunk)
+        writer.write(chunk)
+        writer.flush()
+        written += len(chunk)
+
+        try:
+            while written < self.response_limit:
+                messages = self.session.get_messages(timeout=5)
+                messages = self.encode(messages)
+
+                frame = protocol.message_frame(messages)
+                frame = json.dumps(frame)
+
+                chunk = '<script>\np(%s);\n</script>\r\n' % frame
+                chunk = handler.raw_chunk(chunk)
+                writer.write(chunk)
+                writer.flush()
+                written += len(chunk)
+        except socket.error:
+            self.session.expire()
+
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
+        writer.close()
+
+    def __call__(self, handler, request_method, raw_request_data):
+        return [
+            gevent.spawn(self.stream, handler),
+        ]
 
 class IFrame(BaseTransport):
     direction = 'recv'
 
 class EventSource(BaseTransport):
-    direction = 'send'
+    direction = 'recv'
+
+    TIMING = 5.0
+    response_limit = 4096
+
+    def encode(self, data):
+        # TODO: Not using protocol.encode because it doesn't escape
+        # things properly here. The other version should be fixed at
+        # some point to avoid duplication.
+        data = json.dumps(data, separators=(',', ':'))
+        if isinstance(data, basestring):
+            # Don't both calling json, since its simple
+            data = '[' + data + ']'
+        elif isinstance(data, (object, dict, list)):
+            data = json.dumps(data, separators=(',',':'))
+        else:
+            raise ValueError("Unable to serialize: %s", str(data))
+
+        return protocol.message_frame(data)
+
+    def stream(self, handler):
+        handler.enable_cookie()
+        handler.enable_nocache()
+        handler.headers += [
+            ("Content-Type", "text/event-stream; charset=UTF-8"),
+        ]
+
+        write = handler.start_response("200 OK", handler.headers)
+        write("\r\n")
+        if self.session.is_new():
+            write("data: o\r\n\r\n")
+
+        written = 0
+
+        while written < self.response_limit:
+            messages = self.session.get_messages(timeout=self.TIMING)
+
+            if messages:
+                messages = self.encode(messages)
+            else:
+                messages = protocol.HEARTBEAT
+
+            messages = "data: %s\r\n\r\n" % messages
+
+            write(messages)
+            written += len(messages)
+
+        writer = handler.socket.makefile()
+        zero_chunk = handler.raw_chunk('')
+        writer.write(zero_chunk)
+
+    def __call__(self, handler, request_method, raw_request_data):
+
+        return [
+            gevent.spawn(self.stream, handler),
+        ]
+
 
 # Socket Transports
 # ==================
@@ -423,7 +579,7 @@ class WebSocket(BaseTransport):
             # Hybi = Closed
             # Hixie = None
 
-            if isinstance(messages, Closed) or messages is None:
+            if messages is None:
                 break
 
             try:
@@ -492,7 +648,7 @@ class RawWebSocket(BaseTransport):
 
             message = socket.receive() # blocking
 
-            if isinstance(message, Closed) or message is None:
+            if message is None:
                 break
 
             self.conn.on_message([message])

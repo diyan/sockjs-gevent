@@ -1,7 +1,9 @@
 *~
+*.cfg
 *.swp
 *.swo
 *.pyc
 *.egg-info
-*,cover
+*.cover
 .coverage
+docs/build

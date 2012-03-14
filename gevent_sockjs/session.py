@@ -54,7 +54,7 @@ class Session(object):
             self.forever = True
             return
 
-        # Slide the expirtaion time one more expiration interval
+        # Slide the expiration time one more expiration interval
         # into the future
         if extension is None:
             self.expires_at = datetime.now() + self.expires
@@ -121,10 +121,8 @@ class MemorySession(Session):
     store.
     """
 
-    timer = 10.0
-
     def __init__(self, server, session_id=None):
-        super(MemorySession, self).__init__(server, session_id)
+        super(MemorySession, self).__init__(server, session_id=session_id)
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.server = server
 
@@ -138,6 +136,8 @@ class MemorySession(Session):
         self.queue.put_nowait(msg)
 
     def get_messages(self, **kwargs):
+        timeout = kwargs.get('timeout', None)
+
         self.incr_hits()
 
         if self.queue.empty():
@@ -149,7 +149,10 @@ class MemorySession(Session):
             accum = []
             try:
                 while not self.queue.empty():
-                    accum.append(self.queue.get_nowait())
+                    if timeout:
+                        accum.append(self.queue.get(timeout=timeout))
+                    else:
+                        accum.append(self.queue.get_nowait())
             finally:
                 return accum
 
