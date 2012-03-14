@@ -8,7 +8,7 @@ from socket import error as socketerror
 import protocol
 from errors import *
 
-from geventwebsocket.websocket import Closed, WebSocketError
+from geventwebsocket.websocket import WebSocketError
 
 class BaseTransport(object):
 
@@ -302,7 +302,6 @@ class XHRStreaming(PollingTransport):
             writer.write(headers)
             writer.flush()
 
-            # Should the length of this be added to `written`?
             prelude_chunk = handler.raw_chunk(self.prelude)
             writer.write(prelude_chunk)
 
@@ -317,10 +316,8 @@ class XHRStreaming(PollingTransport):
     def stream(self, handler):
         writer, written = self.write_prelude(handler)
         try:
-            # Should the length of this be added to `written`?
             open_chunk = handler.raw_chunk('o\n')
             writer.write(open_chunk)
-
             writer.flush()
 
             while written < self.response_limit:
@@ -582,7 +579,7 @@ class WebSocket(BaseTransport):
             # Hybi = Closed
             # Hixie = None
 
-            if isinstance(messages, Closed) or messages is None:
+            if messages is None:
                 break
 
             try:
@@ -651,7 +648,7 @@ class RawWebSocket(BaseTransport):
 
             message = socket.receive() # blocking
 
-            if isinstance(message, Closed) or message is None:
+            if message is None:
                 break
 
             self.conn.on_message([message])
