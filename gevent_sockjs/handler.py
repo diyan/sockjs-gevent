@@ -413,7 +413,6 @@ class WSHandler(WebSocketHandler):
         delegates the connection to the right protocol and then
         procedes to invoke the router to figure out what to do.
         """
-
         environ = self.environ
         try:
             try:
