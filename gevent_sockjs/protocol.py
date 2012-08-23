@@ -88,10 +88,16 @@ def decode(data):
     return messages
 
 def close_frame(code, reason, newline=True):
+    if not isinstance(reason, basestring):
+        reason = unicode(reason)
+
+    frame = '%s[%d,"%s"]' % (CLOSE, code, reason)
+
     if newline:
-        return '%s[%d,"%s"]\n' % (CLOSE, code, reason)
-    else:
-        return '%s[%d,"%s"]' % (CLOSE, code, reason)
+        frame += '\n'
+
+    return frame
+
 
 
 def message_frame(data):
