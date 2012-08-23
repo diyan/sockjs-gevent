@@ -35,9 +35,6 @@ class SockJSServer(WSGIServer):
         # hack to get the server inside the router
         self.application.server = self
 
-    def del_session(self, uid):
-        del self.sessions[uid]
-
     def get_session(self, session_id='', create_if_null=False):
         """
         Return an existing or initialize a new session with the
