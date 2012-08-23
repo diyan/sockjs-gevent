@@ -58,12 +58,5 @@ def devel_server():
     A local server with code reload. Should only be used for
     development.
     """
-
-    try:
-        sockjs = SockJSServer(('localhost',8081), router, trace=True)
-        sockjs.serve_forever()
-    except KeyboardInterrupt:
-        sockjs.kill()
-
-if __name__ == '__main__':
-    devel_server()
+    sockjs = SockJSServer(('localhost',8081), router, trace=True)
+    sockjs.serve_forever()
