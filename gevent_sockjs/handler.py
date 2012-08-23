@@ -463,10 +463,8 @@ class WSHandler(WebSocketHandler):
 
         threads = downlink(websocket, None, None)
 
-        # This is a neat trick ( due to Jeffrey Gellens ), of
-        # keeping track of the transporst threads at the handler
-        # level, this ensures that if this thread is forcefully
-        # terminated the transports actions will subsequently
-        # die.
+        # This is a neat trick ( due to Jeffrey Gellens ), of keeping track of
+        # the transporst threads at the handler level, this ensures that if this
+        # thread is forcefully terminated the transports actions will
+        # subsequently die.
         gevent.joinall(threads)
-
