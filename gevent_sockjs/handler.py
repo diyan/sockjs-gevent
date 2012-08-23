@@ -334,8 +334,8 @@ class SockJSHandler(WSGIHandler):
                 self.prep_response()
                 threads = downlink(self, meth, raw_request_data)
 
-                gevent.joinall(threads)
-
+                if threads:
+                    gevent.joinall(threads)
             except Http404 as e:
                 return self.do404(e.message, cookie=True)
             except Http500 as e:
@@ -459,7 +459,6 @@ class WSHandler(WebSocketHandler):
             server,
             transport
         )
-        #downlink.raw = self.raw
 
         threads = downlink(websocket, None, None)
 
