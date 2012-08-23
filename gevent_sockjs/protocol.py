@@ -1,6 +1,6 @@
 import hashlib
-from errors import *
 
+from . import errors as exc
 
 
 # try and use the fastest json implementation
@@ -76,16 +76,15 @@ def decode(data):
     """
     JSON to Python
     """
-    messages = []
-    data = data.decode('utf-8')
+    if isinstance(data, unicode):
+        data = data.decode('utf-8')
 
-    # "a['123', 'abc']" -> [123, 'abc']
     try:
-        messages = json.loads(data)
-    except JSONDecodeError:
-        raise InvalidJSON()
+        return json.loads(data)
+    except ValueError:
+        raise exc.InvalidJSON(data)
 
-    return messages
+
 
 def close_frame(code, reason, newline=True):
     if not isinstance(reason, basestring):
