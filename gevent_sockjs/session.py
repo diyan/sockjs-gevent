@@ -112,9 +112,6 @@ class Session(object):
     def unlock(self):
         self.locked.clear()
 
-    def __str__(self):
-        pass
-
 class MemorySession(Session):
     """
     In memory session with a outgoing gevent Queue as the message
