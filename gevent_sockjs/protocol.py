@@ -1,46 +1,17 @@
 import hashlib
 from errors import *
-from simplejson.decoder import JSONDecodeError
 
-# -----------
-# Serializer
-# -----------
 
-# Fastest
 
-# TODO:
-# Should add some caveats about the unicode compatability
-# with ujson...
+# try and use the fastest json implementation
 try:
-    import ujson
-    has_ujson = True
+    import ujson as json
 except ImportError:
-    has_ujson = False
+    try:
+        import simplejson as json
+    except ImportError:
+        import json
 
-# Faster
-try:
-    import simplejson
-    has_simplejson = True
-except ImportError:
-    has_simplejson = False
-
-# Slowest
-try:
-    import json
-    has_json = True
-except ImportError:
-    # should never happen
-    has_json = False
-
-def pick_serializer():
-    if has_ujson:
-        return ujson
-    elif has_simplejson:
-        return simplejson
-    elif has_json:
-        return json
-
-json = pick_serializer()
 
 # Frames
 # ------
