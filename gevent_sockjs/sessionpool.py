@@ -27,9 +27,9 @@ class SessionPool(object):
 
     def start_gc(self):
         """
-        Start the session pool garbage collector. This is broken
-        out into a seperate function to give you more granular
-        control on the context this thread is spawned in.
+        Start the session pool garbage collector. This is broken out into a
+        separate function to give you more granular control on the context this
+        thread is spawned in.
         """
         if not self.gcthread.started:
             self.gcthread.start()
@@ -91,10 +91,9 @@ class SessionPool(object):
 
     def gc(self):
         """
-        Rearrange the heap flagging active sessions with the id
-        of this collection iteration. This data-structure is
-        time-independent so we sessions can be added to and from
-        without the need to lock the pool.
+        Rearrange the heap flagging active sessions with the id of this
+        collection iteration. This data-structure is time-independent so we
+        sessions can be added to and from without the need to lock the pool.
         """
         if len(self.pool) == 0:
             return
