@@ -101,7 +101,7 @@ class SessionPool(object):
         collection iteration. This data-structure is time-independent so we
         sessions can be added to and from without the need to lock the pool.
         """
-        if len(self.pool) == 0:
+        if not self.pool:
             return
 
         current_time = datetime.now()
