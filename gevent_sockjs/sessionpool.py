@@ -17,7 +17,8 @@ class SessionPool(object):
 
         self.gc_cycle = gc_cycle
     def __str__(self):
-        return str(self.sessions.items())
+        return str(self.sessions)
+
 
     def start_gc(self):
         """
