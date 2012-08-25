@@ -47,11 +47,15 @@ class SessionPool(object):
         if self.stopping:
             raise RuntimeError('SessionPool is stopping')
 
+        if session.expired:
+            # TODO: think about making this an error?
+            raise RuntimeError('Adding expired session to pool')
+
         session.cycle = None
         self.sessions[session.session_id] = session
 
-        if not session.expired:
-            heappush(self.pool, session)
+        heappush(self.pool, session)
+
 
     def get(self, session_id):
         """
