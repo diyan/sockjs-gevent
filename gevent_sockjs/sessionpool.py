@@ -33,10 +33,8 @@ class SessionPool(object):
         """
         if not self.gcthread.started:
             self.gcthread.start()
-            return self.gcthread
-        else:
-            print "Rejected attempt to start multiple garbage \
-            collectors on SessionPool instance."
+
+        return self.gcthread
 
 
     def _gc_sessions(self):
