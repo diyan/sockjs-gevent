@@ -12,7 +12,7 @@ class SessionPool(object):
     gc_cycle = 10.0
 
     def __init__(self):
-        self.sessions = dict()
+        self.sessions = {}
         self.pool = []
         self.gcthread = gevent.Greenlet(self._gc_sessions)
 
