@@ -84,6 +84,8 @@ class SessionPool(object):
             session.expired = True
             session.timeout.set()
 
+        self.gcthread.kill()
+
 
     def __del__(self):
         """
