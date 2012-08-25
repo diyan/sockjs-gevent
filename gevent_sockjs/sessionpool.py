@@ -76,9 +76,9 @@ class SessionPool(object):
         self.stopping = True
 
         while self.pool:
-            head = heappop(self.pool)
-            head.expired = True
-            head.timeout.set()
+            session = heappop(self.pool)
+            session.expired = True
+            session.timeout.set()
 
 
     def __del__(self):
