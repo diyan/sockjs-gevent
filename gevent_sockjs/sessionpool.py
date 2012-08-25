@@ -9,13 +9,13 @@ class SessionPool(object):
 
     See: https://github.com/sdiehl/greengoop
     """
-    gc_cycle = 10.0
 
-    def __init__(self):
+    def __init__(self, gc_cycle=10.0):
         self.sessions = {}
         self.pool = []
         self.gcthread = gevent.Greenlet(self._gc_sessions)
 
+        self.gc_cycle = gc_cycle
     def __str__(self):
         return str(self.sessions.items())
 
