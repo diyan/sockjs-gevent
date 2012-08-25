@@ -1,4 +1,3 @@
-import uuid
 import gevent
 
 from heapq import heappush, heappop
