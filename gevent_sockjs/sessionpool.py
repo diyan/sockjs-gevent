@@ -16,6 +16,9 @@ class SessionPool(object):
         self.gcthread = gevent.Greenlet(self._gc_sessions)
 
         self.gc_cycle = gc_cycle
+        self.stopping = False
+
+
     def __str__(self):
         return str(self.sessions)
 
@@ -39,6 +42,9 @@ class SessionPool(object):
             self.gc()
 
     def add(self, session):
+        if self.stopping:
+            raise RuntimeError('SessionPool is stopping')
+
         session.cycle = None
         self.sessions[session.session_id] = session
 
@@ -62,6 +68,8 @@ class SessionPool(object):
         """
         Manually expire all sessions in the pool.
         """
+        self.stopping = True
+
         while self.pool:
             head = heappop(self.pool)
             head.expired = True
