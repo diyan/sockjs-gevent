@@ -63,11 +63,13 @@ class SessionPool(object):
 
 
     def remove(self, session_id):
-        session = self.sessions.get(session_id, None)
+        session = self.sessions.pop(session_id, None)
 
-        if session:
-            session.post_delete()
-            del self.sessions[session_id]
+        if not session:
+            return
+
+        session.post_delete()
+
 
     def shutdown(self):
         """
