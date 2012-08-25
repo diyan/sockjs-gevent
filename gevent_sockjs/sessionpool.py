@@ -3,6 +3,8 @@ import gevent
 from heapq import heappush, heappop
 from datetime import datetime
 
+
+
 class SessionPool(object):
     """
     A garbage collected Session Pool.
@@ -36,10 +38,12 @@ class SessionPool(object):
             print "Rejected attempt to start multiple garbage \
             collectors on SessionPool instance."
 
+
     def _gc_sessions(self):
         while True:
             gevent.sleep(self.gc_cycle)
             self.gc()
+
 
     def add(self, session):
         if self.stopping:
@@ -56,6 +60,7 @@ class SessionPool(object):
         Get active sessions by their session id.
         """
         return self.sessions.get(session_id, None)
+
 
     def remove(self, session_id):
         session = self.sessions.get(session_id, None)
@@ -75,12 +80,14 @@ class SessionPool(object):
             head.expired = True
             head.timeout.set()
 
+
     def __del__(self):
         """
         On Python interpreter garbage collection expire all sessions, not
         guaranteed to run!
         """
         self.shutdown()
+
 
     def gc(self):
         """
@@ -89,7 +96,6 @@ class SessionPool(object):
         time-independent so we sessions can be added to and from
         without the need to lock the pool.
         """
-
         if len(self.pool) == 0:
             return
 
