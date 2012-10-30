@@ -1,10 +1,9 @@
 import os
 from setuptools import setup, find_packages
 
-version='0.1dev'
+version='0.3.3'
 
 install_requires = [
-    'setuptools',
     'gevent',
     'gevent-websocket',
 ]
@@ -14,7 +13,7 @@ tests_require = install_requires + ['nose']
 def read(f):
     return open(os.path.join(os.path.dirname(__file__), f)).read().strip()
 
-setup(name='gevent-sockjs',
+setup(name='sockjs-gevent',
       version=version,
       description=('gevent base sockjs server'),
       long_description='\n\n'.join((read('README.md'), read('CHANGES.txt'))),
@@ -26,8 +25,8 @@ setup(name='gevent-sockjs',
           "Programming Language :: Python :: Implementation :: CPython",
           "Topic :: Internet :: WWW/HTTP",
           'Topic :: Internet :: WWW/HTTP :: WSGI'],
-      author='Stephen Diehl',
-      author_email='stephen.m.diehl@gmail.com',
+      author='Nick Joyce',
+      author_email='nick@boxdesign.co.uk',
       url='https://github.com/sdiehl/sockjs-gevent',
       license='MIT',
       packages=find_packages(),

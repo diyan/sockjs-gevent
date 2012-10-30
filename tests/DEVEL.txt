@@ -1,8 +1,0 @@
-This is a slightly modified version of the sockjs-protocol test
-suite.
-
-The Makefile has been modified to use arbitrary virtualenvs and
-hook into virtualenevwrapper if you use it.
-
-The suite uses Nose, logs urls on failure, and drops into pdb if
-the tests fail. Just simple stuff to make debuggin easier.
