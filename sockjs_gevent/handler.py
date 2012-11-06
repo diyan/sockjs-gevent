@@ -373,7 +373,7 @@ class Handler(pywsgi.WSGIHandler):
         self.start_response('405 Not Allowed', [
             ('Allow', ', '.join(valid_methods)),
             ('Connection', 'close'),
-            ])
+        ])
 
         self.result = []
         self.process_result()
@@ -518,4 +518,5 @@ class Handler(pywsgi.WSGIHandler):
             except Exception:
                 session.interrupt()
 
-                raise
+                if not isinstance(e, socket.error):
+                    raise
