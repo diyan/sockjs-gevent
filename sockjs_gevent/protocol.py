@@ -46,7 +46,7 @@ def decode(data):
     JSON to Python
     """
     if isinstance(data, unicode):
-        data = data.decode('utf-8')
+        data = data.encode('utf-8')
 
     # quick check to make sure we're going to decode a list
     if data[0] != '[':
