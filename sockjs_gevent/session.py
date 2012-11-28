@@ -462,7 +462,7 @@ class Pool(object):
             session = heappop(self.pool)
 
             if session.open:
-                session.close()
+                session.interrupt()
 
     def gc(self):
         """
