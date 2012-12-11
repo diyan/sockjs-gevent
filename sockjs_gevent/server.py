@@ -70,12 +70,12 @@ class Server(pywsgi.WSGIServer):
         """
         Shutdown the server, block to inform the sessions that they are closing.
         """
+        super(Server, self).stop(timeout=timeout)
+
         for endpoint in self.endpoints.values():
             endpoint.stop()
 
         self.session_pool.stop()
-
-        return super(Server, self).stop(timeout=timeout)
 
     def get_session(self, session_id, create):
         session = self.session_pool.get(session_id)
