@@ -503,7 +503,7 @@ class RawWebSocket(BaseTransport):
         if self.session.open:
             self.session.close()
 
-        if self.websocket and self.websocket.fobj:
+        if self.websocket:
             self.websocket.close()
 
 
