@@ -527,7 +527,10 @@ class RawWebSocket(BaseTransport):
 
                 return []
 
-            self.handle_websocket(handler)
+            try:
+                self.handle_websocket(handler)
+            except WebSocketError:
+                pass
 
         # TODO find a better way to do this.
         ws_handler.__dict__.update(handler.__dict__)
