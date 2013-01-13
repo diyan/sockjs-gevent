@@ -509,7 +509,6 @@ class RawWebSocket(BaseTransport):
         if self.websocket:
             self.websocket.close()
 
-
     def handle_request(self, handler, raw_request_data):
         ws_handler = WSHandler(
             handler.socket,
