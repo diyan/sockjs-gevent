@@ -333,6 +333,9 @@ class StreamingTransport(SendingOnlyTransport):
 
             messages = self.session.get_messages(timeout=self.timeout)
 
+            if not messages:
+                continue
+
             self.write_message_frame(handler, messages)
 
     def handle_request(self, handler, raw_request_data):
