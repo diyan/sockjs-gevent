@@ -73,6 +73,7 @@ class Session(object):
         '_writer',
         'conn',
         'heartbeat_interval',
+        '_hb_thread',
     )
 
     def __init__(self, session_id, ttl_interval=DEFAULT_EXPIRY,
@@ -88,6 +89,7 @@ class Session(object):
 
         self.conn = None
         self.heartbeat_interval = heartbeat_interval
+        self._hb_thread = None
 
     def __del__(self):
         try:
@@ -153,7 +155,7 @@ class Session(object):
 
         self.conn.on_open()
 
-        self.start_heartbeat()
+        self._hb_thread = self.start_heartbeat()
 
     def close(self, reason='closed'):
         """
@@ -170,6 +172,10 @@ class Session(object):
             self.conn.on_close()
 
             self.conn = None
+
+        if self._hb_thread:
+            self._hb_thread.kill()
+            self._hb_thread = None
 
     def dispatch(self, *msgs):
         """
