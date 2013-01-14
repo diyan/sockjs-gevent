@@ -3,6 +3,7 @@ try:
 except ImportError:
     import unittest
 
+import mock
 
 from sockjs_gevent import session
 
@@ -83,3 +84,20 @@ class PoolTestCase(unittest.TestCase):
         self.assertEqual(pool.pool, [])
         self.assertEqual(pool.sessions, {})
         self.assertEqual(pool.cycles, {})
+
+    def test_remove_open_session(self):
+        """
+        If the pool removes an open session, ensure it is interrupted.
+        """
+        session = mock.Mock()
+        session.open = True
+        session.session_id = 'foo'
+
+        pool = self.make_pool()
+
+        pool.add(session)
+
+        pool.remove('foo')
+
+        self.assertTrue(session.interrupt.called)
+
