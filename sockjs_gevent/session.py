@@ -215,6 +215,9 @@ class Session(object):
         """
         Whether this session has expired.
         """
+        if self.closed or self.interrupted:
+            return True
+
         if not self.expires_at:
             return False
 
