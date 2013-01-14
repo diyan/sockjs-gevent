@@ -1,4 +1,5 @@
 import urlparse
+from socket import error as sock_err
 
 import gevent
 from gevent import socket, select
@@ -475,14 +476,20 @@ class RawWebSocket(BaseTransport):
             if not messages:
                 continue
 
-            self.send_messages(messages)
+            try:
+                self.send_messages(messages)
+            except WebSocketError:
+                return
 
     def recv_message(self):
         return self.websocket.receive()
 
     def put(self):
         while self.session.open:
-            message = self.recv_message()
+            try:
+                message = self.recv_message()
+            except WebSocketError:
+                return
 
             if message is None:
                 break
@@ -510,6 +517,8 @@ class RawWebSocket(BaseTransport):
             self.websocket.close()
 
     def handle_request(self, handler, raw_request_data):
+        self.websocket = None
+
         ws_handler = WSHandler(
             handler.socket,
             handler.client_address,
@@ -538,10 +547,14 @@ class RawWebSocket(BaseTransport):
         ws_handler.__dict__.update(handler.__dict__)
         ws_handler.application = app
 
-        ws_handler.handle_one_response()
+        try:
+            ws_handler.handle_one_response()
+        except sock_err:
+            pass
 
     def send_heartbeat(self):
         self.websocket.send(self.encode_frame(protocol.HEARTBEAT))
+
 
 class WebSocket(RawWebSocket):
     def write_close_frame(self, handler, code, reason):
