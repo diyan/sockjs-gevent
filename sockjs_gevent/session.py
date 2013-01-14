@@ -161,6 +161,8 @@ class Session(object):
             # only dispatch the close event if we were previously opened
             self.conn.on_close()
 
+            self.conn = None
+
     def dispatch(self, *msgs):
         """
         Dispatch a message to the bound connection object
