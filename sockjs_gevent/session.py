@@ -423,6 +423,25 @@ class Pool(object):
         if not self.gcthread.started:
             self.gcthread.start()
 
+    def stop(self):
+        """
+        Manually expire all sessions in the pool.
+        """
+        if self.stopping:
+            return
+
+        self.stopping = True
+
+        self.gcthread.kill()
+        self.drain()
+
+    def drain(self):
+        while self.pool:
+            session = heappop(self.pool)
+
+            if session.open:
+                session.interrupt()
+
     def _gc_sessions(self):
         while True:
             gevent.sleep(self.gc_cycle)
@@ -443,23 +462,6 @@ class Pool(object):
         self.sessions[session.session_id] = session
 
         heappush(self.pool, session)
-
-    def stop(self):
-        """
-        Manually expire all sessions in the pool.
-        """
-        if self.stopping:
-            return
-
-        self.stopping = True
-
-        self.gcthread.kill()
-
-        while self.pool:
-            session = heappop(self.pool)
-
-            if session.open:
-                session.interrupt()
 
     def get(self, session_id):
         """
