@@ -408,6 +408,12 @@ class Pool(object):
     def __str__(self):
         return str(self.sessions)
 
+    def __del__(self):
+        try:
+            self.stop()
+        except:
+            pass
+
     def start(self):
         """
         Start the session pool garbage collector. This is broken out into a
