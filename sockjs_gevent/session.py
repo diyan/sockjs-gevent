@@ -437,7 +437,7 @@ class Pool(object):
 
     def drain(self):
         while self.pool:
-            session = heappop(self.pool)
+            last_checked, session = heappop(self.pool)
 
             if session.open:
                 session.interrupt()
@@ -447,7 +447,7 @@ class Pool(object):
             gevent.sleep(self.gc_cycle)
             self.gc()
 
-    def add(self, session):
+    def add(self, session, time_func=time.time):
         if self.stopping:
             raise RuntimeError('SessionPool is stopping')
 
@@ -458,10 +458,10 @@ class Pool(object):
         if not session.new:
             raise RuntimeError('Session has already expired')
 
-        self.cycles[session] = None
+        current_time = self.cycles[session] = time_func()
         self.sessions[session.session_id] = session
 
-        heappush(self.pool, session)
+        heappush(self.pool, (current_time, session))
 
     def get(self, session_id):
         """
@@ -475,19 +475,20 @@ class Pool(object):
         if not session:
             return False
 
-        self.cycles.pop(session, None)
+        current_time = self.cycles.pop(session, None)
 
-        try:
-            self.pool.remove(session)
-        except ValueError:
-            pass
+        if current_time:
+            try:
+                self.pool.remove((current_time, session))
+            except ValueError:
+                pass
 
         if session.open:
             session.interrupt()
 
         return True
 
-    def gc(self):
+    def gc(self, time_func=time.time):
         """
         Rearrange the heap flagging active sessions with the id of this
         collection iteration. This data-structure is time-independent so we
@@ -496,20 +497,19 @@ class Pool(object):
         if not self.pool:
             return
 
-        current_time = time.time()
+        current_time = time_func()
 
         while self.pool:
-            session = self.pool[0]
+            session = self.pool[0][1]
             cycle = self.cycles[session]
-            expired = session.has_expired(current_time)
 
-            if cycle == current_time or not expired:
-                # we've looped through all sessions and all are fresh
+            if cycle >= current_time:
+                # we've looped through all sessions
                 break
 
-            session = heappop(self.pool)
+            last_checked, session = heappop(self.pool)
 
-            if expired:
+            if session.has_expired(current_time):
                 # Session is to be GC'd immediately
                 self.remove(session.session_id)
 
@@ -517,4 +517,4 @@ class Pool(object):
 
             # Flag the session with the id of this GC cycle
             self.cycles[session] = current_time
-            heappush(self.pool, session)
+            heappush(self.pool, (current_time, session))

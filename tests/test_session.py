@@ -26,11 +26,11 @@ class PoolTestCase(unittest.TestCase):
         pool = self.make_pool()
         foo = self.make_session('a')
 
-        pool.add(foo)
+        pool.add(foo, lambda: 5)
 
         self.assertEqual(pool.sessions, {'a': foo})
-        self.assertEqual(pool.pool, [foo])
-        self.assertEqual(pool.cycles, {foo: None})
+        self.assertEqual(pool.pool, [(5, foo)])
+        self.assertEqual(pool.cycles, {foo: 5})
 
     def test_already_added(self):
         """
@@ -101,3 +101,34 @@ class PoolTestCase(unittest.TestCase):
 
         self.assertTrue(session.interrupt.called)
 
+    def test_gc(self):
+        """
+        Ensure that gc will work correctly
+        """
+        pool = self.make_pool()
+        foo = self.make_session('foo')
+        bar = self.make_session('bar')
+        baz = self.make_session('baz')
+
+        sessions = [foo, bar, baz]
+
+        for s in sessions:
+            pool.add(s)
+
+        pool.gc()
+
+        # gc did not move anything around
+        self.assertEqual(pool.sessions, {
+            'foo': foo,
+            'bar': bar,
+            'baz': baz,
+        })
+
+        baz.close()
+
+        pool.gc()
+
+        self.assertEqual(pool.sessions, {
+            'foo': foo,
+            'bar': bar,
+        })
