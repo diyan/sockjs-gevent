@@ -89,6 +89,14 @@ class Session(object):
         self.conn = None
         self.heartbeat_interval = heartbeat_interval
 
+    def __del__(self):
+        try:
+            if self.open:
+                self.interrupt()
+        except:
+            # interrupt() may fail if __init__ didn't complete
+            pass
+
     def bind(self, conn):
         """
         Bind this session to the connection object.
