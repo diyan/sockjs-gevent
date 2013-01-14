@@ -442,6 +442,9 @@ class Pool(object):
         """
         Manually expire all sessions in the pool.
         """
+        if self.stopping:
+            return
+
         self.stopping = True
 
         self.gcthread.kill()
