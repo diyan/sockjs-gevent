@@ -471,7 +471,7 @@ class Pool(object):
         session = self.sessions.pop(session_id, None)
 
         if not session:
-            return
+            return False
 
         self.cycles.pop(session, None)
 
@@ -482,6 +482,8 @@ class Pool(object):
 
         if session.open:
             session.interrupt()
+
+        return True
 
     def gc(self):
         """
