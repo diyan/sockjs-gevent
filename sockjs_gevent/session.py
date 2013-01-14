@@ -438,6 +438,20 @@ class Pool(object):
 
         heappush(self.pool, session)
 
+    def stop(self):
+        """
+        Manually expire all sessions in the pool.
+        """
+        self.stopping = True
+
+        self.gcthread.kill()
+
+        while self.pool:
+            session = heappop(self.pool)
+
+            if session.open:
+                session.interrupt()
+
     def get(self, session_id):
         """
         Get active sessions by their session id.
@@ -459,20 +473,6 @@ class Pool(object):
 
         if session.open:
             session.interrupt()
-
-    def stop(self):
-        """
-        Manually expire all sessions in the pool.
-        """
-        self.stopping = True
-
-        self.gcthread.kill()
-
-        while self.pool:
-            session = heappop(self.pool)
-
-            if session.open:
-                session.interrupt()
 
     def gc(self):
         """
