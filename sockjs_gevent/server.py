@@ -132,6 +132,7 @@ class Connection(object):
         Close this session
         """
         self.session.close()
+        self.session = None
 
 
 class Endpoint(object):
