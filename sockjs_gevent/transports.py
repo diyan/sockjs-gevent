@@ -138,7 +138,10 @@ class BaseTransport(object):
             if not handler.status:
                 handler.start_response('200 OK')
 
-            self.write_close_frame(handler, e.code, e.reason)
+            try:
+                self.write_close_frame(handler, e.code, e.reason)
+            except WebSocketError:
+                pass
         finally:
             self.session.unlock(self, self.readable, self.writable)
 
