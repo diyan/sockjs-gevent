@@ -171,7 +171,7 @@ class Session(object):
             # only dispatch the close event if we were previously opened
             self.conn.on_close()
 
-        self.conn = None
+            self.conn = None
 
         if self._hb_thread:
             self._hb_thread.kill()
