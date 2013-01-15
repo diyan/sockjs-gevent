@@ -551,8 +551,8 @@ class RawWebSocket(BaseTransport):
         ws_handler.application = app
 
         try:
-            ws_handler.handle_one_response()
-        except sock_err:
+            ws_handler.run_application()
+        except (sock_err, WebSocketError):
             pass
 
     def send_heartbeat(self):
