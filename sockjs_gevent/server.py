@@ -125,12 +125,18 @@ class Connection(object):
 
         The message must be JSON encodable.
         """
+        if not self.session:
+            return
+
         self.session.add_messages(message)
 
     def close(self):
         """
         Close this session
         """
+        if not self.session:
+            return
+
         self.session.close()
         self.session = None
 
