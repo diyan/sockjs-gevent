@@ -565,7 +565,11 @@ class WebSocket(RawWebSocket):
     def write_close_frame(self, handler, code, reason):
         if self.websocket:
             frame = protocol.close_frame(code, reason)
-            self.websocket.send(self.encode_frame(frame))
+
+            try:
+                self.websocket.send(self.encode_frame(frame))
+            except WebSocketError:
+                pass
 
             self.websocket.close()
 
