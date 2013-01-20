@@ -337,7 +337,12 @@ class StreamingTransport(SendingOnlyTransport):
             if not messages:
                 continue
 
-            self.write_message_frame(handler, messages)
+            try:
+                self.write_message_frame(handler, messages)
+            except sock_err:
+                self.session.interrupt()
+
+                break
 
     def handle_request(self, handler, raw_request_data):
         super(StreamingTransport, self).handle_request(handler, raw_request_data)
