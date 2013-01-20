@@ -617,11 +617,7 @@ class WebSocket(RawWebSocket):
 
         super(WebSocket, self).handle_websocket(handler)
 
-        try:
-            close_error = self.encode_frame(protocol.close_frame(*protocol.CONN_CLOSED))
-            self.websocket.send(close_error)
-        except:
-            pass
+        self.write_close_frame(handler, *protocol.CONN_CLOSED)
 
 
 transport_types = {
