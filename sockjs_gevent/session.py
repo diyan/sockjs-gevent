@@ -164,14 +164,15 @@ class Session(object):
         :param reason: The final state of this session. See ``state`` for valid
             values.
         """
-        open = self.open
         self.state = reason
 
-        if open and self.conn:
+        if self.conn:
             # only dispatch the close event if we were previously opened
-            self.conn.on_close()
-
-        self.conn = None
+            try:
+                self.conn.on_close()
+            finally:
+                self.conn.close()
+                self.conn = None
 
         if self._hb_thread:
             self._hb_thread.kill()

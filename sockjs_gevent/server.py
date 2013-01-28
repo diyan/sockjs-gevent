@@ -137,8 +137,11 @@ class Connection(object):
         if not self.session:
             return
 
-        self.session.close()
+        # prevent a circular reference issue
+        s = self.session
         self.session = None
+
+        s.close()
 
 
 class Endpoint(object):
