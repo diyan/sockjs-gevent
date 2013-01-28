@@ -334,7 +334,7 @@ class Session(object):
                 break
 
     def start_heartbeat(self):
-        gevent.spawn(self.run_heartbeat)
+        return gevent.spawn(self.run_heartbeat)
 
     def __repr__(self):
         locks = ''
