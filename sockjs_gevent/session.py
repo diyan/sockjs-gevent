@@ -494,7 +494,10 @@ class Pool(object):
                 pass
 
         if session.open:
-            session.interrupt()
+            try:
+                session.interrupt()
+            except Exception:
+                pass
 
         return True
 
