@@ -44,10 +44,12 @@ def devel_server():
     endpoints = {
         'echo': Endpoint(Echo),
         'close': Endpoint(Close),
-        'disabled_websocket_echo': Endpoint(Echo,
+        'disabled_websocket_echo': Endpoint(
+            Echo,
             disabled_transports=['websocket']
         ),
-        'cookie_needed_echo': Endpoint(Echo,
+        'cookie_needed_echo': Endpoint(
+            Echo,
             use_cookie=True
         )
     }
