@@ -42,3 +42,5 @@ if __name__ == '__main__':
     if return_code:
         print test_process.stdout.read()
         print test_process.stderr.read()
+
+        raise SystemExit(return_code)
