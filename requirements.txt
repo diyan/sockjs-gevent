@@ -1,2 +1,2 @@
 gevent>=0.13.6
-gevent-websocket>=0.3.6
+-e git+git://github.com/njoyce/gevent-websocket.git@master#egg=gevent-websocket
