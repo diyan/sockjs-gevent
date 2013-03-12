@@ -15,7 +15,7 @@ install:
 
 before_script:
   - git clone git://github.com/sockjs/sockjs-protocol.git sockjs_protocol
-  - pip install unittest2 websocket-client==0.4.1 git+git://github.com/Lawouach/WebSocket-for-Python.git --use-mirrors
+  - pip install unittest2 websocket-client==0.4.1 ws4py --use-mirrors
 
 script:
   - nosetests
