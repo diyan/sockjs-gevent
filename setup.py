@@ -19,6 +19,10 @@ def get_package_manifest(filename):
                 # comment
                 continue
 
+            if line.startswith('-e '):
+                # not a valid package
+                continue
+
             packages.append(line)
 
     return packages
