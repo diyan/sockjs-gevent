@@ -14,7 +14,7 @@ def run_dev_server():
     )
 
 
-def run_protocol_tests(protocol_test_dir, version):
+def run_protocol(protocol_test_dir, version):
     cmd = '%s %s/sockjs-protocol-%s.py -v' % (
         sys.executable,
         protocol_test_dir,
@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     time.sleep(1.0)
 
-    test_process = run_protocol_tests(*sys.argv[1:])
+    test_process = run_protocol(*sys.argv[1:])
 
     return_code = test_process.wait()
     server_process.kill()
