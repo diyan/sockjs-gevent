@@ -241,5 +241,139 @@ class WriteTestCase(BaseHandlerTestCase):
         result = handler.write_text('This is a test!')
 
         self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), 'This is a test!')
         app.assertStatus('200 OK')
         app.assertContentType('text/plain; encoding=UTF-8')
+
+    def test_write_html(self):
+        """
+        Writing a html response must call `start_response` with the correct
+        content type.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.write_html('This is a test!')
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), 'This is a test!')
+        app.assertStatus('200 OK')
+        app.assertContentType('text/html; encoding=UTF-8')
+
+    def test_write_js(self):
+        """
+        Writing a json response must call `start_response` with the correct
+        content type.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.write_js('This is a test!')
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), 'This is a test!')
+        app.assertStatus('200 OK')
+        app.assertContentType('application/json; encoding=UTF-8')
+
+    def test_write_js_object(self):
+        """
+        Passing in a Python object should attempt to encode it in JSON
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.write_js({'foo': 'bar'})
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), '{"foo": "bar"}')
+        app.assertStatus('200 OK')
+        app.assertContentType('application/json; encoding=UTF-8')
+
+    def test_write_nothing(self):
+        """
+        `write_nothing` must send a 204 response
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.write_nothing()
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), '')
+        app.assertStatus('204 No Content')
+        app.assertHeaders([])
+
+    def test_not_allowed(self):
+        """
+        `not_allowed` must send a 405 response.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.not_allowed(['GET'])
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), '')
+        app.assertStatus('405 Not Allowed')
+
+        expected_headers = [
+            ('Allow', 'GET'),
+            ('Connection', 'close'),
+        ]
+        app.assertHeaders(expected_headers)
+
+    def test_bad_request(self):
+        """
+        `bad_request` must send a 400 response.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.bad_request('Naughty!')
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), 'Naughty!')
+        app.assertStatus('400 Bad Request')
+        app.assertHeaders([])
+
+    def test_not_modified(self):
+        """
+        `not_modified` must send a 304 response.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.not_modified()
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), '')
+        app.assertStatus('304 Not Modified')
+        app.assertHeaders([])
+
+    def test_not_found(self):
+        """
+        `not_found` must send a 404 response.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.not_found('Foo Bar!')
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), 'Foo Bar!')
+        app.assertStatus('404 Not Found')
+        app.assertContentType('text/plain; encoding=UTF-8')
+        app.assertCookie()
+
+    def test_internal_error(self):
+        """
+        `internal_error` must send a 500 response.
+        """
+        app = self.make_app()
+        handler = self.make_handler({}, app.start_response)
+
+        result = handler.internal_error()
+
+        self.assertEqual(result, app.out.write)
+        self.assertEqual(app.out.getvalue(), '')
+        app.assertStatus('500 Internal Server Error')

@@ -208,8 +208,8 @@ class BaseHandler(object):
         """
         return self.write_response(None, status='304 Not Modified', **kwargs)
 
-    def do404(self, message=None, status='404 Now Found', cookie=True,
-              content_type='text/plain'):
+    def not_found(self, message=None, status='404 Not Found', cookie=True,
+                  content_type='text/plain'):
         """
         Do a 404 NOT FOUND response.
         """
@@ -225,9 +225,13 @@ class BaseHandler(object):
 
         return str('\n'.join(stack_trace))
 
-    def do500(self, message=None, exc_info=None, **kwargs):
+    def internal_error(self, message=None, exc_info=None, trace=False,
+                       **kwargs):
+        """
+        Return a 500 Internal Server Error response.
+        """
         if not message:
-            if self.server.trace:
+            if trace:
                 if not exc_info:
                     exc_info = sys.exc_info()
 
