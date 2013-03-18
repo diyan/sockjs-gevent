@@ -17,10 +17,10 @@ except ImportError:
         return json.dumps(obj, separators=(',', ':'), indent=0)
 
 
-OPEN      = "o"
-CLOSE     = "c"
-MESSAGE   = "a"
-HEARTBEAT = "h\n"
+OPEN = "o"
+CLOSE = "c"
+MESSAGE = "a"
+HEARTBEAT = "h"
 
 # known error code/message
 CONN_INTERRUPTED = (1002, "Connection interrupted")
