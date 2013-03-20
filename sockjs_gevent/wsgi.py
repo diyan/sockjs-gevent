@@ -1,7 +1,6 @@
 import hashlib
 import re
 import socket
-import uuid
 
 from . import transports, util, server
 
@@ -213,9 +212,7 @@ class SockJSWSGIApplication(server.SockJSApplication):
             return handler.do_iframe()
 
         if path == 'websocket':
-            session_id = uuid.uuid4()
-
-            handler.do_transport(None, session_id, 'rawwebsocket')
+            handler.do_transport(None, None, 'rawwebsocket')
 
             return
 

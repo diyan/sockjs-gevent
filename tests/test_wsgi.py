@@ -453,3 +453,14 @@ class WSGIApplicationTestCase(unittest.TestCase):
         handler = self.run_path(app, path)
 
         self.assertTrue(handler.not_found.called)
+
+    def test_raw_websocket(self):
+        """
+        Urls of the format /foo/websocket must call do_transport
+        """
+        app = self.make_app()
+        path = '/foo/websocket'
+
+        handler = self.run_path(app, path)
+
+        handler.do_transport.assert_called_with(None, None, 'rawwebsocket')
