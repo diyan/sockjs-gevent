@@ -132,6 +132,15 @@ class WSGITestApp(object):
 
         self.test.assertEqual(seconds_delta, 86399)
 
+    def assertNotCached(self):
+        """
+        Checks the response from ``start_response`` for a valid non-cacheable
+        response.
+        """
+        self.assertHasHeader(
+            ('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        )
+
     def assertCors(self):
         """
         Ensures that the response is cross domain compatible.
@@ -150,14 +159,13 @@ class BaseHandlerTestCase(unittest.TestCase):
     Tests for `util.BaseHandler`
     """
 
+    handler_class = util.BaseHandler
+
     def make_app(self):
         return WSGITestApp(self)
 
-    def make_handler(self, environ, start_response):
-        if environ is None:
-            environ = {}
-
-        return util.BaseHandler(environ, start_response)
+    def make_handler(self, *args):
+        return self.handler_class(*args)
 
 
 class OptionHandlerTestCase(BaseHandlerTestCase):

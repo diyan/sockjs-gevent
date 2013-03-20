@@ -1,48 +1,72 @@
-from gevent import pywsgi
+import warnings
+import random
 
-from . import session, handler
+from . import session, transports
 
 
-class Server(pywsgi.WSGIServer):
+HEARTBEAT_INTERVAL = 25.0  # seconds
+
+
+class SockJSApplication(object):
     """
-    The base SockJS server.
+    Base logic for doing all things at the application layer
     """
 
-    session_backend = session.MemorySession
-    handler_class = handler.Handler
+    session_class = session.MemorySession
 
-    heartbeat_interval = 25.0
-
-    # required to support pywsgi WSGI interface
-    application = None
-
-    def __init__(self, listener, endpoints, **kwargs):
+    def __init__(self, endpoints=None):
         """
-        Initialize the SockJS server
+        Builds a SockJS Application object.
+
+        :param endpoints: A dict of name -> Endpoint instances. The key of the
+            dict will be used in the path of the SockJS url.
         """
-        self.trace = kwargs.pop('trace', False)
         self.endpoints = {}
-        self.session_pool = session.Pool()
-        self.heartbeat_interval = kwargs.pop('heartbeat_interval',
-            self.heartbeat_interval)
+        self.started = False
 
-        super(Server, self).__init__(listener, application=None, **kwargs)
+        if endpoints:
+            for name, endpoint in endpoints.iteritems():
+                self.add_endpoint(name, endpoint)
 
-        for name, endpoint in endpoints.iteritems():
-            self.add_endpoint(name, endpoint)
+    def start(self):
+        """
+        Start the server.
+        """
+        if self.started:
+            return
+
+        self.started = True
+
+        self.session_pool.start()
+
+        for endpoint in self.endpoints.values():
+            endpoint.start()
+
+    def stop(self, timeout=None):
+        """
+        Shutdown the application, block to inform the sessions that they are
+        closing.
+        """
+        self.session_pool.stop()
+
+        for endpoint in self.endpoints.values():
+            endpoint.stop()
 
     def add_endpoint(self, name, endpoint):
+        name = name.encode('punycode')
+
         if name in self.endpoints:
             raise NameError('%r endpoint already exists' % (name,))
 
         self.endpoints[name] = endpoint
 
-        endpoint.server = self
+        endpoint.bind(self)
 
         if self.started:
             endpoint.start()
 
     def remove_endpoint(self, name):
+        name = name.encode('punycode')
         endpoint = self.endpoints.pop(name, None)
 
         if not endpoint:
@@ -53,35 +77,16 @@ class Server(pywsgi.WSGIServer):
         return endpoint
 
     def get_endpoint(self, name):
+        name = name.encode('punycode')
+
         return self.endpoints.get(name, None)
-
-    def start(self):
-        """
-        Start the server.
-        """
-        self.session_pool.start()
-
-        for endpoint in self.endpoints.values():
-            endpoint.start()
-
-        return super(Server, self).start()
-
-    def stop(self, timeout=None):
-        """
-        Shutdown the server, block to inform the sessions that they are closing.
-        """
-        super(Server, self).stop(timeout=timeout)
-
-        for endpoint in self.endpoints.values():
-            endpoint.stop()
-
-        self.session_pool.stop()
 
     def get_session(self, session_id, create):
         session = self.session_pool.get(session_id)
 
         if not session and create:
-            session = self.session_backend(session_id,
+            session = self.session_backend(
+                session_id,
                 heartbeat_interval=self.heartbeat_interval)
             self.session_pool.add(session)
 
@@ -95,6 +100,11 @@ class Connection(object):
     """
     Binds a SockJS session to an endpoint
     """
+
+    __slots__ = (
+        'endpoint',
+        'session',
+    )
 
     def __init__(self, endpoint, session):
         self.endpoint = endpoint
@@ -110,8 +120,8 @@ class Connection(object):
         Called when a message has been decoded from the SockJS session.
 
         The message is what was sent from the SockJS client, this could be a
-        simple string or a dict etc. It is up to subclasses to handle validation
-        of the message.
+        simple string or a dict etc. It is up to subclasses to handle
+        validation of the message.
         """
 
     def on_close(self):
@@ -152,8 +162,9 @@ class Endpoint(object):
     to each Session.
     """
 
-    def __init__(self, connection_class=Connection, disabled_transports=None,
-                 use_cookie=False, sockjs_url='http'):
+    def __init__(self, connection_class=Connection, use_cookie=False,
+                 client_url=None, heartbeat_interval=HEARTBEAT_INTERVAL,
+                 trace=False, disabled_transports=None):
         """
         Builds an endpoint.
 
@@ -163,15 +174,29 @@ class Endpoint(object):
             values.
         :param use_cookie: Whether to use the cookie to support sticky sessions
             when behind load balancers like HAProxy.
-        :param sockjs_url: The url of the SockJS client, used when a transport
+        :param client_url: The url of the SockJS client, used when a transport
             does not support CORS (cross domain communication).
         """
         self.connection_class = connection_class
-        self.disabled_transports = tuple(disabled_transports or ())
         self.use_cookie = use_cookie
-        self.sockjs_url = sockjs_url
+        self.disabled_transports = list(disabled_transports or ())
+        self.heartbeat_interval = heartbeat_interval
+        self.client_url = client_url
+        self.trace = trace
 
-    def make_connection(self, handler, session):
+        if not self.client_url:
+            warnings.warning(RuntimeWarning, 'client_url not supplied, '
+                             'disabling CORS transports')
+            for label in transports.get_transports(cors=True):
+                self.disabled_transports.apppend(label)
+
+    def bind(self, app):
+        """
+        Bind this endpoint to a SockJS Application object.
+        """
+        self.app = app
+
+    def make_connection(self, session):
         return self.connection_class(self, session)
 
     def transport_allowed(self, transport):
@@ -188,3 +213,18 @@ class Endpoint(object):
         """
         Called when this endpoint is stopping serving requests.
         """
+        self.app = None
+
+    def get_info(self):
+        """
+        :returns: The data necessary to fulfill an info request
+        """
+        entropy = random.randint(1, 2 ** 32)
+
+        return {
+            'cookie_needed': self.use_cookie,
+            'websocket': self.transport_allowed('websocket'),
+            'origins': ['*:*'],
+            'entropy': entropy,
+            'server_heartbeat_interval': self.heartbeat_interval
+        }
