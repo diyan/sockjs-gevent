@@ -9,17 +9,17 @@ except ImportError:
 
 import mock
 
-from sockjs_gevent import wsgi
+from sockjs_gevent import router
 
 from test_util import BaseHandlerTestCase
 
 
 class RequestHandlerTestCase(BaseHandlerTestCase):
     """
-    Tests for wsgi.RequestHandler
+    Tests for router.RequestHandler
     """
 
-    handler_class = wsgi.RequestHandler
+    handler_class = router.RequestHandler
 
 
 class GreetingTestCase(RequestHandlerTestCase):
@@ -297,7 +297,7 @@ class MockApp(object):
 
 class RequestRouterTestCase(unittest.TestCase):
     """
-    Tests for ``wsgi.route_request``
+    Tests for ``router.route_request``
     """
 
     def make_environ(self, path):
@@ -320,7 +320,7 @@ class RequestRouterTestCase(unittest.TestCase):
         environ = self.make_environ(path)
 
         handler = mock.Mock()
-        wsgi.route_request(app, environ, handler)
+        router.route_request(app, environ, handler)
 
         return handler
 
