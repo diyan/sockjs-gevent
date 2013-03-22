@@ -3,7 +3,7 @@ import random
 
 from gevent import pywsgi
 
-from . import session, transports
+from . import session, transports, router
 
 # this url is used by SockJS-node, maintained by the creator of SockJS
 DEFAULT_CLIENT_URL = 'https://d1fxtkz8shb9d2.cloudfront.net/sockjs-0.3.min.js'
@@ -53,8 +53,6 @@ class Application(object):
         """
         MAY be called when this object is garbage collected.
         """
-        super(Application, self).__del__()
-
         try:
             self.stop()
         except:
@@ -77,10 +75,13 @@ class Application(object):
         Shutdown the application, block to inform the endpoints that they are
         closing.
         """
+        if not self.started:
+            return
+
         for endpoint in self.endpoints.values():
             endpoint.stop()
 
-        self.endpoints = {}
+        self.started = False
 
     def add_endpoint(self, name, endpoint):
         """
@@ -251,13 +252,13 @@ class Endpoint(object):
             self.disabled_transports.extend(disabled_transports)
 
     def finalise_options(self):
+        self.disabled_transports = list(set(self.disabled_transports or []))
+
         if not self.client_url:
             warnings.warning(RuntimeWarning, 'client_url not supplied, '
                              'disabling CORS transports')
             for label in transports.get_transports(cors=True):
                 self.disabled_transports.apppend(label)
-
-        self.disabled_transports = list(set(self.disabled_transports or []))
 
     def make_connection(self, session):
         return self.connection_class(self, session)
@@ -317,20 +318,14 @@ class Endpoint(object):
         }
 
 
-class WSGIHandler(pywsgi.WSGIHandler, wsgi.RequestHandler):
-    @property
-    def stream(self):
-        return 
+class WSGIHandler(pywsgi.WSGIHandler, router.RequestHandler):
     def run_application(self):
-        wsgi.route_request(self.server, self.environ, self)
-
-
+        router.route_request(self.server, self.environ, self)
 
 
 class Server(pywsgi.WSGIServer, Application):
     """
     """
-
 
     def __init__(self, listener, endpoints=None, options=None, **kwargs):
         super(pywsgi.WSGIServer, self).__init__(listener, **kwargs)
