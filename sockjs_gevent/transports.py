@@ -670,3 +670,7 @@ def waitany(events, timeout=None):
     finally:
         for event in events:
             event.unlink(update)
+
+
+def get_transports(**kwargs):
+    pass

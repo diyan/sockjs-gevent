@@ -8,6 +8,7 @@ from . import session, transports, router
 # this url is used by SockJS-node, maintained by the creator of SockJS
 DEFAULT_CLIENT_URL = 'https://d1fxtkz8shb9d2.cloudfront.net/sockjs-0.3.min.js'
 HEARTBEAT_INTERVAL = 25.0  # seconds
+MAX_ENTROPY = 2 ** 32
 
 
 DEFAULT_OPTIONS = {
@@ -220,7 +221,7 @@ class Endpoint(object):
 
         self.init_options()
 
-        self.apply_options(options)
+        self.apply_options(options, _init=True)
 
     def bind_to_application(self, app):
         """
@@ -231,34 +232,53 @@ class Endpoint(object):
         self.apply_options(app.default_options)
 
     def init_options(self):
-        self.apply_options(DEFAULT_OPTIONS)
+        self.disabled_transports = []
+        self.apply_options(DEFAULT_OPTIONS, _init=True)
 
-    def apply_options(self, orig_options):
+    def apply_options(self, orig_options, _init=False):
         # copied so checks can be made for unused options
         options = orig_options.copy()
+        sentinel = object()
 
-        self.use_cookie = options.pop('use_cookie')
-        self.client_url = options.pop('client_url')
-        self.trace = options.pop('trace')
-        self.heartbeat_interval = options.pop('heartbeat_interval')
+        def get_option(key):
+            value = options.pop(key, sentinel)
+
+            if not _init and hasattr(self, key):
+                return
+
+            if value is sentinel:
+                return
+
+            setattr(self, key, value)
+
+        get_option('use_cookie')
+        get_option('client_url')
+        get_option('trace')
+        get_option('heartbeat_interval')
 
         # disabled transports is a special case in that values are additive
-        disabled_transports = options.pop('disabled_transports')
+        disabled_transports = options.pop('disabled_transports', None)
 
         if disabled_transports:
             if not self.disabled_transports:
                 self.disabled_transports = []
 
-            self.disabled_transports.extend(disabled_transports)
+            for transport in disabled_transports:
+                if transport not in self.disabled_transports:
+                    self.disabled_transports.append(transport)
+
+        if options:
+            raise ValueError('Unknown config %r' % (options,))
 
     def finalise_options(self):
         self.disabled_transports = list(set(self.disabled_transports or []))
 
         if not self.client_url:
-            warnings.warning(RuntimeWarning, 'client_url not supplied, '
-                             'disabling CORS transports')
+            message = 'client_url not supplied, disabling CORS transports'
+            warnings.warn(message, RuntimeWarning)
+
             for label in transports.get_transports(cors=True):
-                self.disabled_transports.apppend(label)
+                self.disabled_transports.append(label)
 
     def make_connection(self, session):
         return self.connection_class(self, session)
@@ -279,35 +299,42 @@ class Endpoint(object):
             self.session_pool = self.pool_class()
 
         self.session_pool.start()
+        self.started = True
 
     def stop(self, timeout=None):
         """
         Called when this endpoint is stopping serving requests.
         """
+        if not self.started:
+            return
+
         self.session_pool.stop()
         self.session_pool = None
 
         self.started = False
 
-    def get_session(self, session_id, create):
-        session = self.session_pool.get(session_id)
+    def make_session(self, session_id):
+        return self.session_class(session_id)
 
-        if not session and create:
-            session = self.session_backend(
-                session_id,
-                heartbeat_interval=self.heartbeat_interval)
-            self.session_pool.add(session)
+    def get_session(self, session_id):
+        if not self.session_pool:
+            raise RuntimeError(
+                'Tried to get a session when the endppoint was not started')
 
-        return session
+        return self.session_pool.get(session_id)
 
     def remove_session(self, session_id):
+        if not self.session_pool:
+            raise RuntimeError(
+                'Tried to get a session when the endppoint was not started')
+
         self.session_pool.remove(session_id)
 
-    def get_info(self):
+    def get_info(self, randint=random.randint):
         """
         :returns: The data necessary to fulfill an info request
         """
-        entropy = random.randint(1, 2 ** 32)
+        entropy = randint(1, MAX_ENTROPY)
 
         return {
             'cookie_needed': self.use_cookie,
