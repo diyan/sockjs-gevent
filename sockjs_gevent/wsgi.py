@@ -2,7 +2,7 @@ import hashlib
 import re
 import socket
 
-from . import transports, util, server
+from . import transports, util
 
 
 IFRAME_PATH_RE = re.compile(r'iframe([0-9-.a-z_]*)\.html')
@@ -72,7 +72,7 @@ class RequestHandler(util.BaseHandler):
 
         self.write_js(info, cors=True, cache=False)
 
-    def do_transport(self, server_id, session_id, transport):
+    def do_transport(self, endpoint, server_id, session_id, transport):
         # validate the transport value
         transport_cls = transports.get_transport_class(transport)
 
@@ -82,7 +82,7 @@ class RequestHandler(util.BaseHandler):
             return
 
         # check if the transport is disabled for this endpoint
-        if not self.app.transport_allowed(transport):
+        if not endpoint.transport_allowed(transport):
             self.not_found()
 
             return
@@ -91,7 +91,7 @@ class RequestHandler(util.BaseHandler):
         create = transport_cls.readable
         # basic transport validation is out the way (the quick stuff)
         # lets set up the session
-        session = self.server.get_session(session_id, create)
+        session = endpoint.get_session(session_id, create)
 
         if not session:
             # on a writable transport and there is no session
@@ -100,7 +100,7 @@ class RequestHandler(util.BaseHandler):
             return
 
         if session.new:
-            conn = self.endpoint.make_connection(self, session)
+            conn = endpoint.make_connection(self, session)
 
             session.bind(conn)
 
@@ -121,138 +121,121 @@ class RequestHandler(util.BaseHandler):
                 if e:
                     raise
 
-                self.server.remove_session(session.session_id)
+                endpoint.remove_session(session.session_id)
 
 
-class SockJSWSGIApplication(server.SockJSApplication):
-    """
-    The SockJS WSGI application
-    """
+def route_request(app, environ, handler):
+    # first get the endpoint name from the path
+    path_info = environ['PATH_INFO'].split('/')[1:]
 
-    def __call__(self, environ, start_response):
-        handler = RequestHandler(self, environ, start_response)
+    try:
+        endpoint_path = path_info.pop(0)
+    except IndexError:
+        # PATH_INFO == /
+        # undefined behaviour in the protocol spec
+        handler.do_greeting()
 
-        self.handle_request(handler, environ, start_response)
+        return
 
-        return []
+    if not endpoint_path:
+        # /
+        handler.do_greeting()
 
-    def handle_request(self, handler, environ, start_response):
-        # first get the endpoint name from the path
-        path_info = environ['PATH_INFO'].split('/')[1:]
+        return
 
-        try:
-            endpoint_path = path_info.pop(0)
-        except IndexError:
-            # PATH_INFO == /
-            # undefined behaviour in the protocol spec
+    endpoint = app.get_endpoint(endpoint_path)
+
+    if not endpoint:
+        handler.not_found('Unknown endpoint %r' % (endpoint_path,))
+
+        return
+
+    handler.set_endpoint(endpoint)
+
+    # next level of path can be a greeting, info, iframe, raw websocket or
+    # sockjs transport uri
+    try:
+        path = path_info.pop(0)
+    except IndexError:
+        # /echo
+        handler.do_greeting()
+
+        return
+
+    if not path:
+        # /echo/
+        if not path_info:
             handler.do_greeting()
 
             return
 
-        if not endpoint_path:
-            # /
-            handler.do_greeting()
+        # /echo//
+        handler.not_found()
 
-            return
+        return
 
-        endpoint = self.get_endpoint(endpoint_path)
-
-        if not endpoint:
-            handler.not_found('Unknown endpoint %r' % (endpoint_path,))
-
-            return
-
-        handler.set_endpoint(endpoint)
-
-        # next level of path can be a greeting, info, iframe, raw websocket or
-        # sockjs transport uri
+    if path == 'info':
         try:
             path = path_info.pop(0)
         except IndexError:
-            # /echo
-            handler.do_greeting()
+            handler.do_info()
 
             return
 
-        if not path:
-            # /echo/
-            if not path_info:
-                handler.do_greeting()
+        if not path_info:
+            handler.do_info()
 
-                return
+            return
 
-            # /echo//
+        handler.not_found()
+
+        return
+
+    if path.startswith('iframe'):
+        if not IFRAME_PATH_RE.match(path):
             handler.not_found()
 
             return
 
-        if path == 'info':
-            try:
-                path = path_info.pop(0)
-            except IndexError:
-                handler.do_info()
+        return handler.do_iframe()
 
-                return
+    if path == 'websocket':
+        handler.do_transport(None, None, 'rawwebsocket')
 
-            if not path_info:
-                handler.do_info()
+        return
 
-                return
+    # from here on in the only valid url is a transport url of the form
+    # /<server_id>/<session_id>/<transport
+    server_id = path
 
-            handler.not_found()
+    # server_id values cannot contain '.'
+    if not server_id or '.' in server_id:
+        handler.not_found()
 
-            return
+        return
 
-        if path.startswith('iframe'):
-            if not IFRAME_PATH_RE.match(path):
-                handler.not_found()
+    try:
+        session_id = path_info.pop(0)
+    except IndexError:
+        handler.not_found()
 
-                return
+        return
 
-            return handler.do_iframe()
+    if not session_id or '.' in session_id:
+        handler.not_found()
 
-        if path == 'websocket':
-            handler.do_transport(None, None, 'rawwebsocket')
+        return
 
-            return
+    try:
+        transport = path_info.pop(0)
+    except IndexError:
+        handler.not_found()
 
-        # from here on in the only valid url is a transport url of the form
-        # /<server_id>/<session_id>/<transport
-        server_id = path
+        return
 
-        # server_id values cannot contain '.'
-        if not server_id or '.' in server_id:
-            handler.not_found()
+    if not transport or path_info:
+        handler.not_found()
 
-            return
+        return
 
-        try:
-            session_id = path_info.pop(0)
-        except IndexError:
-            handler.not_found()
-
-            return
-
-        if not session_id or '.' in session_id:
-            handler.not_found()
-
-            return
-
-        try:
-            transport = path_info.pop(0)
-        except IndexError:
-            handler.not_found()
-
-            return
-
-        if not transport:
-            handler.not_found()
-
-            return
-
-        if path_info:
-            handler.not_found()
-
-            return
-
-        handler.do_transport(server_id, session_id, transport)
+    handler.do_transport(server_id, session_id, transport)

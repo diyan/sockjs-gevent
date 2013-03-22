@@ -283,9 +283,21 @@ class IframeTestCase(RequestHandlerTestCase):
         app.assertHeaders([])
 
 
-class WSGIApplicationTestCase(unittest.TestCase):
+class MockApp(object):
     """
-    Tests for ``wsgi.SockJSWSGIApplication``
+    A mock SockJS App that handles endpoint discovery.
+    """
+
+    def __init__(self, endpoints=None):
+        self.endpoints = endpoints or {}
+
+    def get_endpoint(self, name):
+        return self.endpoints.get(name, None)
+
+
+class RequestRouterTestCase(unittest.TestCase):
+    """
+    Tests for ``wsgi.route_request``
     """
 
     def make_environ(self, path):
@@ -302,13 +314,13 @@ class WSGIApplicationTestCase(unittest.TestCase):
                 'foo': mock.Mock()
             }
 
-        return wsgi.SockJSWSGIApplication(endpoints)
+        return MockApp(endpoints)
 
     def run_path(self, app, path, test_app=None):
         environ = self.make_environ(path)
 
         handler = mock.Mock()
-        app.handle_request(handler, environ, None)
+        wsgi.route_request(app, environ, handler)
 
         return handler
 
