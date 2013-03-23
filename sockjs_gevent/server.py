@@ -31,8 +31,6 @@ class Application(object):
         application. Can be overridden by the Endpoint.
     """
 
-    session_class = session.MemorySession
-
     def __init__(self, endpoints=None, **options):
         """
         Builds a SockJS Application object.
