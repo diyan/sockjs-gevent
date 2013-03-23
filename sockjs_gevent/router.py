@@ -28,12 +28,6 @@ IFRAME_HTML = """
 
 
 class RequestHandler(util.BaseHandler):
-
-    def __init__(self, app, environ, start_response):
-        super(RequestHandler, self).__init__(environ, start_response)
-
-        self.app = app
-
     def do_greeting(self):
         """
         """
