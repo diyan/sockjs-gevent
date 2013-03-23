@@ -34,7 +34,7 @@ class GreetingTestCase(RequestHandlerTestCase):
         environ = {}
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         expected_headers = [
             ('Allow', 'OPTIONS, GET'),
@@ -63,7 +63,7 @@ class GreetingTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         result = handler.do_greeting()
 
@@ -87,7 +87,7 @@ class GreetingTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         result = handler.do_greeting()
 
@@ -110,7 +110,7 @@ class InfoTestCase(RequestHandlerTestCase):
         environ = {}
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         expected_headers = [
             ('Allow', 'OPTIONS, GET'),
@@ -139,7 +139,7 @@ class InfoTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         result = handler.do_info(None)
 
@@ -163,7 +163,7 @@ class InfoTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
         endpoint = mock.Mock()
 
         endpoint.get_info.return_value = {'foo': 'bar'}
@@ -191,7 +191,7 @@ class IframeTestCase(RequestHandlerTestCase):
         environ = {}
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         expected_headers = [
             ('Allow', 'OPTIONS, GET'),
@@ -220,7 +220,7 @@ class IframeTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
 
         result = handler.do_iframe(None)
 
@@ -244,7 +244,7 @@ class IframeTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
         endpoint = mock.Mock()
 
         endpoint.client_url = 'http://unittest/foobar'
@@ -270,7 +270,7 @@ class IframeTestCase(RequestHandlerTestCase):
         }
 
         app = self.make_app()
-        handler = self.make_handler(None, environ, app.start_response)
+        handler = self.make_handler(environ, app.start_response)
         endpoint = mock.Mock()
 
         endpoint.client_url = 'http://unittest/foobar'
@@ -308,8 +308,8 @@ class RequestRouterTestCase(unittest.TestCase):
             'PATH_INFO': path
         }
 
-    def make_app(self, endpoints=None):
-        if endpoints is None:
+    def make_app(self, **endpoints):
+        if not endpoints:
             endpoints = {
                 'foo': mock.Mock()
             }
@@ -448,12 +448,13 @@ class RequestRouterTestCase(unittest.TestCase):
         """
         Urls of the form /foo/bar/baz/gak must call handler.do_transport
         """
-        app = self.make_app()
+        endpoint = mock.Mock()
+        app = self.make_app(foo=endpoint)
         path = '/foo/bar/baz/gak'
 
         handler = self.run_path(app, path)
 
-        handler.do_transport.assert_called_with('bar', 'baz', 'gak')
+        handler.do_transport.assert_called_with(endpoint, 'bar', 'baz', 'gak')
 
     def test_transport_trailing(self):
         """
