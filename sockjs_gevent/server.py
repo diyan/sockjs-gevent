@@ -3,7 +3,7 @@ import random
 
 from gevent import pywsgi
 
-from . import session, transports, router
+from . import session, transports, handler
 
 # this url is used by SockJS-node, maintained by the creator of SockJS
 DEFAULT_CLIENT_URL = 'https://d1fxtkz8shb9d2.cloudfront.net/sockjs-0.3.min.js'
@@ -345,16 +345,12 @@ class Endpoint(object):
         }
 
 
-class WSGIHandler(pywsgi.WSGIHandler, router.RequestHandler):
-    def run_application(self):
-        router.route_request(self.server, self.environ, self)
-
-
 class Server(pywsgi.WSGIServer, Application):
     """
     """
 
     def __init__(self, listener, endpoints=None, options=None, **kwargs):
-        super(pywsgi.WSGIServer, self).__init__(listener, **kwargs)
+        kwargs.set_default('handler_class', handler.Handler)
 
+        super(pywsgi.WSGIServer, self).__init__(listener, **kwargs)
         super(Application, self).__init__(endpoints, **(options or {}))
