@@ -45,7 +45,7 @@ class BaseTransport(object):
     # session
     timeout = 5.0
 
-    def __init__(self, session, handler):
+    def __init__(self, stream, environ, session):
         """
         Constructor for the transport.
 

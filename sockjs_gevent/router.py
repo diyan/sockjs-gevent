@@ -28,8 +28,6 @@ IFRAME_HTML = """
 
 
 class RequestHandler(util.BaseHandler):
-    stream = None
-
     def do_greeting(self):
         """
         """
@@ -95,8 +93,7 @@ class RequestHandler(util.BaseHandler):
 
             session.bind(conn)
 
-        stream = self.make_stream()
-        transport = transport_cls(stream, self.environ, session)
+        transport = transport_cls(self, self.environ, session)
 
         try:
             transport.handle_request()
@@ -105,9 +102,6 @@ class RequestHandler(util.BaseHandler):
 
             if not isinstance(exc, socket.error):
                 raise
-
-    def make_stream(self):
-        raise NotImplementedError
 
 
 def route_request(app, environ, handler):
