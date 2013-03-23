@@ -321,12 +321,50 @@ class Endpoint(object):
 
         return self.session_pool.get(session_id)
 
+    def add_session(self, session_id, session):
+        """
+        Add a session to this endpoints session pool
+        """
+        self.session_pool.add(session_id, session)
+
     def remove_session(self, session_id):
         if not self.session_pool:
             raise RuntimeError(
                 'Tried to get a session when the endppoint was not started')
 
         self.session_pool.remove(session_id)
+
+    def get_session_for_transport(self, session_id, transport):
+        """
+        Return a session based on the supplied session_id and transport.
+
+        There is some nuance to this, SockJS allows multiple socket connections
+        to reuse the same session_id concurrently. They are all handled as
+        valid sessions.
+
+        :param session_id: The identifier of the session.
+        :param transport: A transport interface.
+        :returns: A session object to be used for this transport. If ``None``
+            is returned, the connection must be aborted.
+        """
+        if transport.socket:
+            # socket transport sessions do not get added to the session pool
+            return self.make_session(session_id)
+
+        session = self.get_session(session_id)
+
+        if session:
+            return session
+
+        if transport.writable:
+            # A writable transport is being requested but there is no existing
+            # session. A session can only be set up by a readable transport.
+            return
+
+        session = self.make_session(session_id)
+        self.add_session(session_id, session)
+
+        return session
 
     def get_info(self, randint=random.randint):
         """

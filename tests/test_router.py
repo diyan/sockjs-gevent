@@ -9,7 +9,7 @@ except ImportError:
 
 import mock
 
-from sockjs_gevent import router
+from sockjs_gevent import router, transports
 
 from test_util import BaseHandlerTestCase
 
@@ -281,6 +281,100 @@ class IframeTestCase(RequestHandlerTestCase):
 
         app.assertStatus('304 Not Modified')
         app.assertHeaders([])
+
+
+class TransportTestCase(RequestHandlerTestCase):
+    """
+    Tests for `RequestHandler.do_transport`
+    """
+
+    def make_endpoint(self):
+        endpoint = mock.Mock()
+
+        endpoint.transport_allowed.return_value = True
+
+        return endpoint
+
+    def test_transport_not_allowed(self):
+        """
+        Attempting to connect to an endpoint that does not allow the transport
+        type must result in ``not_found`` being called.
+        """
+        environ = {}
+
+        app = self.make_app()
+        endpoint = mock.Mock()
+        handler = self.make_handler(environ, app.start_response)
+
+        endpoint.transport_allowed.return_value = False
+
+        handler.do_transport(endpoint, None, None, 'foobar')
+
+        app.assertStatus('404 Not Found')
+        app.assertCookie()
+        app.assertContentType('text/plain; encoding=UTF-8')
+
+    @mock.patch.object(transports, 'get_transport_class')
+    def test_missing_transport(self, mock_get_transport_class):
+        """
+        If transports.get_transport_class returns ``None`` then ``not_found``
+        must be called.
+        """
+        environ = {}
+
+        app = self.make_app()
+        endpoint = self.make_endpoint()
+        handler = self.make_handler(environ, app.start_response)
+
+        mock_get_transport_class.return_value = None
+        handler.do_transport(endpoint, None, None, 'foobar')
+
+        app.assertStatus('404 Not Found')
+        app.assertCookie()
+        app.assertContentType('text/plain; encoding=UTF-8')
+
+    @mock.patch.object(transports, 'get_transport_class')
+    def test_bind_new_session(self, mock_get_transport_class):
+        """
+        A new session must make a new connection and bind to it.
+        """
+        environ = {}
+
+        app = self.make_app()
+        endpoint = self.make_endpoint()
+        handler = self.make_handler(environ, app.start_response)
+
+        readable_transport = mock.Mock()
+        mock_get_transport_class.return_value = readable_transport
+
+        readable_transport.socket = False
+        readable_transport.writable = False
+
+        session = mock.Mock()
+        endpoint.get_session.return_value = session
+
+        with mock.patch.object(handler, 'handle_transport'):
+            handler.do_transport(endpoint, None, 'xyz', 'foobar')
+
+    @mock.patch.object(transports, 'get_transport_class')
+    def test_unknown_transport_session(self, mock_get_transport_class):
+        """
+        If ``get_session_for_transport`` does not return a valid session,
+        ``not_found`` must be called.
+        """
+        environ = {}
+
+        app = self.make_app()
+        endpoint = self.make_endpoint()
+        handler = self.make_handler(environ, app.start_response)
+
+        endpoint.get_session_for_transport.return_value = None
+        readable_transport = mock.Mock()
+        mock_get_transport_class.return_value = readable_transport
+
+        readable_transport.socket = False
+
+        handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
 
 class MockApp(object):

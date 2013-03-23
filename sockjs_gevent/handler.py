@@ -1,20 +1,44 @@
 from gevent import pywsgi
 
+from . import router
 
-class Handler(pywsgi.WSGIHandler):
+
+class HandlerStream(object):
     """
-    The basic handler for all things SockJS. Does all path handling and
-    validation.
+    A very basic file like object that pushes bytes around.
 
-    For urls that support it, delegates all responsibility of the response to a
-    transport class.
+    Provides a simple wrapper API around the socket/handler combo.
     """
 
-    def start_streaming(self):
-        self.result = None
+    __slots__ = (
+        'handler',
+        'read',
+        'write'
+    )
 
-        if self.request_version == 'HTTP/1.1':
-            self.headers['Connection'] = 'keep-alive'
-            self.response_use_chunked = True
-        else:
-            self.headers['Connection'] = 'close'
+    def __init__(self, handler):
+        self.handler = handler
+
+        socket = handler.socket
+        rfile = handler.rfile
+
+        if not rfile:
+            rfile = socket.makefile('rb', -1)
+
+        self.read = rfile.read
+        self.write = socket.sendall
+
+
+class Handler(pywsgi.WSGIHandler, router.RequestHandler):
+    """
+    """
+
+    stream = None
+
+    def run_application(self):
+        self.stream = self.make_stream()
+
+        router.route_request(self.server, self.environ, self)
+
+    def make_stream(self):
+        return HandlerStream(self)

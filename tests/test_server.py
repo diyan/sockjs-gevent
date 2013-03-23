@@ -135,6 +135,17 @@ class ApplicationTestCase(unittest.TestCase):
         self.assertNotIn('foo', app.endpoints)
         self.assertTrue(endpoint.stop.called)
 
+    def test_del_exception(self):
+        """
+        Ensure that when __del__ is called, no exception is raised.
+        """
+        app = self.make_app()
+
+        with mock.patch.object(app, 'stop') as mock_stop:
+            mock_stop.side_effect = RuntimeError
+
+            app.__del__()
+
 
 class ConnectionTestCase(unittest.TestCase):
     """
@@ -214,6 +225,8 @@ class ConnectionTestCase(unittest.TestCase):
         session.close.side_effect = RuntimeError
 
         conn.close()
+
+
 
 
 class EndpointTestCase(unittest.TestCase):
@@ -458,6 +471,18 @@ class EndpointTestCase(unittest.TestCase):
 
         session_pool.remove.assert_called_with('foobar')
 
+    def test_add_session(self):
+        """
+        Basic sanity checks for ``add_session``.
+        """
+        endpoint = self.make_endpoint()
+        session_pool = endpoint.session_pool = mock.Mock()
+        session = object()
+
+        endpoint.add_session('foobar', session)
+
+        session_pool.add.assert_called_with('foobar', session)
+
     def test_remove_session_not_started(self):
         """
         Calling ``remove_session`` when the endpoint has not been started must
@@ -501,3 +526,108 @@ class EndpointTestCase(unittest.TestCase):
 
         self.assertFalse(result['websocket'])
 
+
+class SessionForTransportTestCase(unittest.TestCase):
+    """
+    Tests for ``Endpoint.session_for_transport``
+    """
+
+    def make_endpoint(self, **kwargs):
+        endpoint = server.Endpoint(**kwargs)
+
+        endpoint.start()
+
+        return endpoint
+
+    def test_socket_transport(self):
+        """
+        A socket transport must not add itself to the endpoint session_pool.
+        """
+        socket_transport = mock.Mock()
+        endpoint = self.make_endpoint()
+
+        socket_transport.socket = True
+        session = object()
+
+        @mock.patch.object(endpoint, 'add_session')
+        @mock.patch.object(endpoint, 'make_session')
+        def do_test(make_session, add_session):
+            add_session.side_effect = RuntimeError
+            make_session.return_value = session
+
+            return endpoint.get_session_for_transport(None, socket_transport)
+
+        result = do_test()
+        self.assertIs(session, result)
+
+    def test_writable_transport_no_session(self):
+        """
+        A writable transport that does not have a session established must
+        return ``None``.
+        """
+        endpoint = self.make_endpoint()
+        writable_transport = mock.Mock()
+
+        writable_transport.socket = False
+        writable_transport.writable = True
+
+        with mock.patch.object(endpoint, 'make_session') as mock_session:
+            mock_session.side_effect = RuntimeError
+
+            result = endpoint.get_session_for_transport(
+                None, writable_transport)
+
+        self.assertIsNone(result)
+
+    def test_readable_transport_add_session(self):
+        """
+        A readable transport must register the session on the endpoint.
+        """
+        endpoint = self.make_endpoint()
+        readable_transport = mock.Mock()
+
+        readable_transport.socket = False
+        readable_transport.writable = False
+
+        session = object()
+
+        @mock.patch.object(endpoint, 'add_session')
+        @mock.patch.object(endpoint, 'make_session')
+        def do_test(make_session, add_session):
+            make_session.return_value = session
+
+            result = endpoint.get_session_for_transport(
+                'xyz', readable_transport)
+
+            add_session.assert_called_with('xyz', session)
+
+            return result
+
+        result = do_test()
+
+        self.assertIs(result, session)
+
+    def test_get_existing_session(self):
+        """
+        Getting an existing session for a transport must not add it to the
+        endpoint.
+        """
+        endpoint = self.make_endpoint()
+        readable_transport = mock.Mock()
+
+        readable_transport.socket = False
+
+        session = object()
+
+        @mock.patch.object(endpoint, 'add_session')
+        @mock.patch.object(endpoint, 'get_session')
+        def do_test(get_session, add_session):
+            add_session.side_effect = RuntimeError
+            get_session.return_value = session
+
+            return endpoint.get_session_for_transport(
+                'xyz', readable_transport)
+
+        result = do_test()
+
+        self.assertIs(result, session)

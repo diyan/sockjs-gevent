@@ -28,6 +28,8 @@ IFRAME_HTML = """
 
 
 class RequestHandler(util.BaseHandler):
+    stream = None
+
     def do_greeting(self):
         """
         """
@@ -66,29 +68,24 @@ class RequestHandler(util.BaseHandler):
 
         self.write_js(info, cors=True, cache=False)
 
-    def do_transport(self, endpoint, server_id, session_id, transport):
+    def do_transport(self, endpoint, server_id, session_id, transport_type):
+        # check if the transport is disabled for this endpoint
+        if not endpoint.transport_allowed(transport_type):
+            self.not_found()
+
+            return
+
         # validate the transport value
-        transport_cls = transports.get_transport_class(transport)
+        transport_cls = transports.get_transport_class(transport_type)
 
         if not transport_cls:
             self.not_found()
 
             return
 
-        # check if the transport is disabled for this endpoint
-        if not endpoint.transport_allowed(transport):
-            self.not_found()
-
-            return
-
-        # only create sessions if the transport being used is readable
-        create = transport_cls.readable
-        # basic transport validation is out the way (the quick stuff)
-        # lets set up the session
-        session = endpoint.get_session(session_id, create)
+        session = endpoint.get_session_for_transport(session_id, transport_cls)
 
         if not session:
-            # on a writable transport and there is no session
             self.not_found()
 
             return
@@ -98,24 +95,23 @@ class RequestHandler(util.BaseHandler):
 
             session.bind(conn)
 
-        transport_handler = transport_cls(session, self)
-        e = None
+        self.handle_transport(endpoint, session, transport_cls)
+
+    def handle_transport(self, endpoint, session, transport_cls):
+        stream = self.make_stream()
+
+        transport = transport_cls(session, stream, self.environ)
 
         try:
-            raw_request_data = self.wsgi_input.readline()
-
-            transport_handler(self, raw_request_data)
+            transport.handle_request()
         except Exception, e:
             session.interrupt()
 
             if not isinstance(e, socket.error):
                 raise
-        finally:
-            if transport_handler.is_socket:
-                if e:
-                    raise
 
-                endpoint.remove_session(session.session_id)
+    def make_stream(self):
+        raise NotImplementedError
 
 
 def route_request(app, environ, handler):
@@ -143,8 +139,6 @@ def route_request(app, environ, handler):
         handler.not_found('Unknown endpoint %r' % (endpoint_path,))
 
         return
-
-    handler.set_endpoint(endpoint)
 
     # next level of path can be a greeting, info, iframe, raw websocket or
     # sockjs transport uri
@@ -199,7 +193,7 @@ def route_request(app, environ, handler):
         return
 
     # from here on in the only valid url is a transport url of the form
-    # /<server_id>/<session_id>/<transport
+    # /<server_id>/<session_id>/<transport>
     server_id = path
 
     # server_id values cannot contain '.'
@@ -232,4 +226,4 @@ def route_request(app, environ, handler):
 
         return
 
-    handler.do_transport(server_id, session_id, transport)
+    handler.do_transport(endpoint, server_id, session_id, transport)
