@@ -353,7 +353,7 @@ class TransportTestCase(RequestHandlerTestCase):
         session = mock.Mock()
         endpoint.get_session.return_value = session
 
-        with mock.patch.object(handler, 'handle_transport'):
+        with mock.patch.object(handler, 'make_stream'):
             handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
     @mock.patch.object(transports, 'get_transport_class')
@@ -376,6 +376,70 @@ class TransportTestCase(RequestHandlerTestCase):
 
         handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
+    @mock.patch.object(transports, 'get_transport_class')
+    def test_session_interrupt_on_exc(self, mock_get_transport_class):
+        """
+        If a transport raises an exception, it must be propagated.
+        The session must be interrupted.
+        """
+        endpoint = self.make_endpoint()
+        handler = self.make_handler({}, None)
+        transport_cls = mock.Mock()
+        session = mock.Mock()
+
+        session.new = False
+        transport_cls.socket = False
+
+        endpoint.get_session_for_transport.return_value = session
+        mock_get_transport_class.return_value = transport_cls
+
+        with mock.patch.object(handler, 'make_stream') as mock_stream:
+            stream = object()
+            transport = mock.Mock()
+
+            transport_cls.return_value = transport
+            mock_stream.return_value = stream
+
+            transport.handle_request.side_effect = RuntimeError
+
+            with self.assertRaises(RuntimeError) as ctx:
+                handler.do_transport(endpoint, None, 'xyz', 'foobar')
+
+            transport_cls.assert_called_with(stream, {}, session)
+            session.interrupt.assert_called_with()
+
+    @mock.patch.object(transports, 'get_transport_class')
+    def test_session_interrupt_socket_error(self, mock_get_transport_class):
+        """
+        If a transport raisea a socket.error exception, it must be swallowed.
+        The session must be interrupted.
+        """
+        import socket
+
+        endpoint = self.make_endpoint()
+        handler = self.make_handler({}, None)
+        transport_cls = mock.Mock()
+        session = mock.Mock()
+
+        session.new = False
+        transport_cls.socket = False
+
+        endpoint.get_session_for_transport.return_value = session
+        mock_get_transport_class.return_value = transport_cls
+
+        with mock.patch.object(handler, 'make_stream') as mock_stream:
+            stream = object()
+            transport = mock.Mock()
+
+            transport_cls.return_value = transport
+            mock_stream.return_value = stream
+
+            transport.handle_request.side_effect = socket.error
+
+            handler.do_transport(endpoint, None, 'xyz', 'foobar')
+
+            transport_cls.assert_called_with(stream, {}, session)
+            session.interrupt.assert_called_with()
 
 class MockApp(object):
     """

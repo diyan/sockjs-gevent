@@ -95,19 +95,15 @@ class RequestHandler(util.BaseHandler):
 
             session.bind(conn)
 
-        self.handle_transport(endpoint, session, transport_cls)
-
-    def handle_transport(self, endpoint, session, transport_cls):
         stream = self.make_stream()
-
-        transport = transport_cls(session, stream, self.environ)
+        transport = transport_cls(stream, self.environ, session)
 
         try:
             transport.handle_request()
-        except Exception, e:
+        except Exception, exc:
             session.interrupt()
 
-            if not isinstance(e, socket.error):
+            if not isinstance(exc, socket.error):
                 raise
 
     def make_stream(self):
