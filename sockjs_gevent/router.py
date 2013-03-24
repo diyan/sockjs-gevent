@@ -100,6 +100,11 @@ class RequestHandler(util.BaseHandler):
         except Exception, exc:
             session.interrupt()
 
+            self.internal_error(
+                unicode(exc),
+                headers=transport_obj.get_headers()
+            )
+
             if not isinstance(exc, socket.error):
                 raise
 

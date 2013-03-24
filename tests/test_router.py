@@ -397,9 +397,13 @@ class TransportTestCase(RequestHandlerTestCase):
         transport_cls.return_value = transport
 
         transport.handle_request.side_effect = RuntimeError
+        transport.get_headers.return_value = []
 
-        with self.assertRaises(RuntimeError):
-            handler.do_transport(endpoint, None, 'xyz', 'foobar')
+        with mock.patch.object(handler, 'internal_error') as internal_error:
+            with self.assertRaises(RuntimeError):
+                handler.do_transport(endpoint, None, 'xyz', 'foobar')
+
+            internal_error.assert_called_with(u'', headers=[])
 
         transport_cls.assert_called_with(session, handler, {})
         transport.handle_request.assert_called_with()
@@ -428,8 +432,12 @@ class TransportTestCase(RequestHandlerTestCase):
 
         transport_cls.return_value = transport
         transport.handle_request.side_effect = socket.error
+        transport.get_headers.return_value = []
 
-        handler.do_transport(endpoint, None, 'xyz', 'foobar')
+        with mock.patch.object(handler, 'internal_error') as internal_error:
+            handler.do_transport(endpoint, None, 'xyz', 'foobar')
+
+            internal_error.assert_called_with(u'', headers=[])
 
         transport_cls.assert_called_with(session, handler, {})
         transport.handle_request.assert_called_with()
