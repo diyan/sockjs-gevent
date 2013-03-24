@@ -93,7 +93,7 @@ class RequestHandler(util.BaseHandler):
 
             session.bind(conn)
 
-        transport = transport_cls(self, self.environ, session)
+        transport = transport_cls(session, self, self.environ)
 
         try:
             transport.handle_request()

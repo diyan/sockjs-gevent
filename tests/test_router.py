@@ -401,7 +401,8 @@ class TransportTestCase(RequestHandlerTestCase):
         with self.assertRaises(RuntimeError) as ctx:
             handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
-        transport_cls.assert_called_with(handler, {}, session)
+        transport_cls.assert_called_with(session, handler, {})
+        transport.handle_request.assert_called_with()
         session.interrupt.assert_called_with()
 
     @mock.patch.object(transports, 'get_transport_class')
@@ -430,7 +431,8 @@ class TransportTestCase(RequestHandlerTestCase):
 
         handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
-        transport_cls.assert_called_with(handler, {}, session)
+        transport_cls.assert_called_with(session, handler, {})
+        transport.handle_request.assert_called_with()
         session.interrupt.assert_called_with()
 
 class MockApp(object):
