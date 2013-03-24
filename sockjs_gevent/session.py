@@ -48,8 +48,8 @@ class Session(object):
         - new: session is new and has not been ``opened`` yet.
         - open: session has been opened and is in a usable state.
         - interrupted: an interaction with the session was not completed
-          successfully and is now in an undefined state - messages may have been
-          lost.
+          successfully and is now in an undefined state - messages may have
+          been lost.
         - closed: a session has been closed successfully and is now ready for
           garbage collection.
     :ivar expires_at: The timestamp at which this session will expire.
@@ -63,7 +63,6 @@ class Session(object):
         holds the lock for writing messages to this session.
     """
 
-    # slots help a lot with memory consumption on servers with a lot of sessions
     __slots__ = (
         'session_id',
         'state',
@@ -73,11 +72,9 @@ class Session(object):
         '_writer',
         'conn',
         'heartbeat_interval',
-        '_hb_thread',
     )
 
-    def __init__(self, session_id, ttl_interval=DEFAULT_EXPIRY,
-                 heartbeat_interval=HEARTBEAT_INTERVAL):
+    def __init__(self, session_id, ttl_interval=DEFAULT_EXPIRY):
         self.state = 'new'
         self.session_id = session_id
 
@@ -88,12 +85,10 @@ class Session(object):
         self._writer = None
 
         self.conn = None
-        self.heartbeat_interval = heartbeat_interval
-        self._hb_thread = None
 
     def __del__(self):
         try:
-            if self.open:
+            if self.opened:
                 self.interrupt()
         except:
             # interrupt() may fail if __init__ didn't complete
@@ -110,7 +105,7 @@ class Session(object):
         return self.state == 'new'
 
     @property
-    def open(self):
+    def opened(self):
         return self.state == 'open'
 
     @property
@@ -142,7 +137,7 @@ class Session(object):
         """
         self.close('interrupted')
 
-    def start(self):
+    def open(self):
         """
         Ready this session for accepting/dispatching messages.
         """
@@ -153,9 +148,7 @@ class Session(object):
         self.state = 'open'
         assert self.conn
 
-        self.conn.on_open()
-
-        self._hb_thread = self.start_heartbeat()
+        self.conn.session_opened()
 
     def close(self, reason='closed'):
         """
@@ -169,14 +162,9 @@ class Session(object):
         if self.conn:
             # only dispatch the close event if we were previously opened
             try:
-                self.conn.on_close()
+                self.conn.session_closed()
             finally:
-                self.conn.close()
                 self.conn = None
-
-        if self._hb_thread:
-            self._hb_thread.kill()
-            self._hb_thread = None
 
     def dispatch(self, *msgs):
         """
