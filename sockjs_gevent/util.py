@@ -4,6 +4,7 @@ import sys
 import time
 import traceback
 from wsgiref.handlers import format_date_time
+from gevent import event
 
 from . import protocol
 
@@ -244,3 +245,23 @@ class BaseHandler(object):
             content_type='text/plain',
             **kwargs
         )
+
+
+def waitany(events, timeout=None, result_class=event.AsyncResult):
+    result = result_class()
+    update = result.set
+
+    try:
+        for event in events:
+            if not event.started:
+                event.start()
+
+            if event.ready():
+                return event
+            else:
+                event.rawlink(update)
+
+        return result.get(timeout=timeout)
+    finally:
+        for event in events:
+            event.unlink(update)

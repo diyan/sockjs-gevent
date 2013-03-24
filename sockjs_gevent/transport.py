@@ -250,7 +250,7 @@ class SendingOnlyTransport(BaseTransport):
             thread.start()
 
         # wait for one to return
-        ret = waitany(threads)
+        ret = util.waitany(threads)
 
         if ret == producer:
             # the producer thread returned first, all good here.
@@ -507,7 +507,7 @@ class RawWebSocket(BaseTransport):
             gevent.spawn(self.put),
         ]
 
-        ret = waitany(threads)
+        ret = util.waitany(threads)
         threads.remove(ret)
         gevent.killall(threads)
 
