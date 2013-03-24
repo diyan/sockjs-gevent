@@ -9,7 +9,7 @@ except ImportError:
 
 import mock
 
-from sockjs_gevent import router, transports
+from sockjs_gevent import router, transport
 
 from test_util import BaseHandlerTestCase
 
@@ -314,11 +314,11 @@ class TransportTestCase(RequestHandlerTestCase):
         app.assertCookie()
         app.assertContentType('text/plain; encoding=UTF-8')
 
-    @mock.patch.object(transports, 'get_transport_class')
+    @mock.patch.object(transport, 'get_transport_class')
     def test_missing_transport(self, mock_get_transport_class):
         """
-        If transports.get_transport_class returns ``None`` then ``not_found``
-        must be called.
+        If ``transport.get_transport_class`` returns ``None`` then
+        ``not_found`` must be called.
         """
         environ = {}
 
@@ -333,7 +333,7 @@ class TransportTestCase(RequestHandlerTestCase):
         app.assertCookie()
         app.assertContentType('text/plain; encoding=UTF-8')
 
-    @mock.patch.object(transports, 'get_transport_class')
+    @mock.patch.object(transport, 'get_transport_class')
     def test_bind_new_session(self, mock_get_transport_class):
         """
         A new session must make a new connection and bind to it.
@@ -355,7 +355,7 @@ class TransportTestCase(RequestHandlerTestCase):
 
         handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
-    @mock.patch.object(transports, 'get_transport_class')
+    @mock.patch.object(transport, 'get_transport_class')
     def test_unknown_transport_session(self, mock_get_transport_class):
         """
         If ``get_session_for_transport`` does not return a valid session,
@@ -375,7 +375,7 @@ class TransportTestCase(RequestHandlerTestCase):
 
         handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
-    @mock.patch.object(transports, 'get_transport_class')
+    @mock.patch.object(transport, 'get_transport_class')
     def test_session_interrupt_on_exc(self, mock_get_transport_class):
         """
         If a transport raises an exception, it must be propagated.
@@ -398,14 +398,14 @@ class TransportTestCase(RequestHandlerTestCase):
 
         transport.handle_request.side_effect = RuntimeError
 
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(RuntimeError):
             handler.do_transport(endpoint, None, 'xyz', 'foobar')
 
         transport_cls.assert_called_with(session, handler, {})
         transport.handle_request.assert_called_with()
         session.interrupt.assert_called_with()
 
-    @mock.patch.object(transports, 'get_transport_class')
+    @mock.patch.object(transport, 'get_transport_class')
     def test_session_interrupt_socket_error(self, mock_get_transport_class):
         """
         If a transport raisea a socket.error exception, it must be swallowed.
@@ -434,6 +434,7 @@ class TransportTestCase(RequestHandlerTestCase):
         transport_cls.assert_called_with(session, handler, {})
         transport.handle_request.assert_called_with()
         session.interrupt.assert_called_with()
+
 
 class MockApp(object):
     """

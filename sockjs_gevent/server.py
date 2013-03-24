@@ -3,7 +3,7 @@ import random
 
 from gevent import pywsgi
 
-from . import session, transports, handler
+from . import session, transport, handler
 
 # this url is used by SockJS-node, maintained by the creator of SockJS
 DEFAULT_CLIENT_URL = 'https://d1fxtkz8shb9d2.cloudfront.net/sockjs-0.3.min.js'
@@ -261,9 +261,9 @@ class Endpoint(object):
             if not self.disabled_transports:
                 self.disabled_transports = []
 
-            for transport in disabled_transports:
-                if transport not in self.disabled_transports:
-                    self.disabled_transports.append(transport)
+            for transport_type in disabled_transports:
+                if transport_type not in self.disabled_transports:
+                    self.disabled_transports.append(transport_type)
 
         if options:
             raise ValueError('Unknown config %r' % (options,))
@@ -275,7 +275,7 @@ class Endpoint(object):
             message = 'client_url not supplied, disabling CORS transports'
             warnings.warn(message, RuntimeWarning)
 
-            for label in transports.get_transports(cors=True):
+            for label in transport.get_transports(cors=True):
                 self.disabled_transports.append(label)
 
     def make_connection(self, session):

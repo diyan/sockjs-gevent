@@ -323,13 +323,13 @@ class EndpointTestCase(unittest.TestCase):
         """
         Ensure that ``finalise_options`` will clean up disabled_transports
         """
-        from sockjs_gevent import transports
+        from sockjs_gevent import transport
 
         endpoint = self.make_endpoint(client_url=None)
 
         self.assertIsNone(endpoint.client_url)
 
-        patcher = mock.patch.object(transports, 'get_transports')
+        patcher = mock.patch.object(transport, 'get_transports')
 
         with patcher as mock_get_transports:
             mock_get_transports.return_value = ['test']

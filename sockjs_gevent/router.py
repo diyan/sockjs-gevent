@@ -2,7 +2,7 @@ import hashlib
 import re
 import socket
 
-from . import transports, util
+from . import transport, util
 
 
 IFRAME_PATH_RE = re.compile(r'iframe([0-9-.a-z_]*)\.html')
@@ -74,7 +74,7 @@ class RequestHandler(util.BaseHandler):
             return
 
         # validate the transport value
-        transport_cls = transports.get_transport_class(transport_type)
+        transport_cls = transport.get_transport_class(transport_type)
 
         if not transport_cls:
             self.not_found()
@@ -93,10 +93,10 @@ class RequestHandler(util.BaseHandler):
 
             session.bind(conn)
 
-        transport = transport_cls(session, self, self.environ)
+        transport_obj = transport_cls(session, self, self.environ)
 
         try:
-            transport.handle_request()
+            transport_obj.handle_request()
         except Exception, exc:
             session.interrupt()
 
