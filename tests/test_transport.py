@@ -89,6 +89,26 @@ class HandlerTestCase(unittest.TestCase):
 
         transport_mock.prepare_request.assert_called_with()
 
+    def test_socket_property(self):
+        """
+        Test sanity for the ``socket`` property
+        """
+        handler = mock.Mock()
+
+        def make_transport(readable, writable):
+            tport = self.make_transport(
+                handler,
+                readable=readable,
+                writable=writable
+            )
+
+            return tport.socket
+
+        self.assertFalse(make_transport(False, False))
+        self.assertFalse(make_transport(False, True))
+        self.assertFalse(make_transport(True, False))
+        self.assertTrue(make_transport(True, True))
+
     def test_fail_to_acquire_session(self):
         """
         If ``session.SessionUnavailable`` is raised when acquiring a session,
