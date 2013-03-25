@@ -26,7 +26,6 @@ class Application(object):
 
     :ivar endpoints: A mapping of name -> Endpoint instances. The name is used
         as part of the SockJS url routing.
-    :ivar started: Whether this application has started.
     :ivar default_options: A key -> value mapping of default options for the
         application. Can be overridden by the Endpoint.
     """
@@ -39,7 +38,6 @@ class Application(object):
             dict will be used in the path of the SockJS url.
         """
         self.endpoints = {}
-        self.started = False
 
         self.default_options = DEFAULT_OPTIONS.copy()
         self.default_options.update(options)
@@ -61,26 +59,16 @@ class Application(object):
         """
         Start the server.
         """
-        if self.started:
-            return
-
-        self.started = True
-
         for endpoint in self.endpoints.values():
             endpoint.start()
 
-    def stop(self, timeout=None):
+    def stop(self):
         """
         Shutdown the application, block to inform the endpoints that they are
         closing.
         """
-        if not self.started:
-            return
-
         for endpoint in self.endpoints.values():
             endpoint.stop()
-
-        self.started = False
 
     def add_endpoint(self, name, endpoint):
         """
@@ -96,9 +84,6 @@ class Application(object):
         self.endpoints[name] = endpoint
 
         endpoint.bind_to_application(self)
-
-        if self.started:
-            endpoint.start()
 
     def remove_endpoint(self, name):
         endpoint = self.endpoints.pop(name, None)
@@ -386,7 +371,13 @@ class Server(pywsgi.WSGIServer, Application):
     """
 
     def __init__(self, listener, endpoints=None, options=None, **kwargs):
-        kwargs.set_default('handler_class', handler.Handler)
+        kwargs.setdefault('handler_class', handler.Handler)
 
-        super(pywsgi.WSGIServer, self).__init__(listener, **kwargs)
-        super(Application, self).__init__(endpoints, **(options or {}))
+        pywsgi.WSGIServer.__init__(self, listener, **kwargs)
+        Application.__init__(self, endpoints, **(options or {}))
+
+    def add_endpoint(self, name, endpoint):
+        super(Server, self).add_endpoint(name, endpoint)
+
+        if self.started:
+            endpoint.start()

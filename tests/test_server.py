@@ -41,17 +41,11 @@ class ApplicationTestCase(unittest.TestCase):
         endpoint = mock.Mock()
         app = self.make_app(foo=endpoint)
 
-        self.assertFalse(app.started)
         self.assertFalse(endpoint.start.called)
 
         app.start()
 
-        self.assertTrue(app.started)
         self.assertTrue(endpoint.start.called)
-
-        endpoint.start.side_effect = RuntimeError
-
-        app.start()
 
     def test_stop(self):
         """
@@ -62,17 +56,11 @@ class ApplicationTestCase(unittest.TestCase):
 
         app.start()
 
-        self.assertTrue(app.started)
         self.assertFalse(endpoint.stop.called)
 
         app.stop()
 
-        self.assertFalse(app.started)
         self.assertTrue(endpoint.stop.called)
-
-        endpoint.stop.side_effect = RuntimeError
-
-        app.stop()
 
     def test_add_endpoint(self):
         """
@@ -87,21 +75,6 @@ class ApplicationTestCase(unittest.TestCase):
         self.assertIs(endpoint, app.endpoints['foo'])
         endpoint.bind_to_application.assert_called_with(app)
 
-    def test_add_endpoint_start_app(self):
-        """
-        Ensure that endpoint.start() is called when adding an endpoint to an
-        already started applications.
-        """
-        endpoint = mock.Mock()
-        app = self.make_app()
-
-        app.start()
-
-        self.assertFalse(endpoint.start.called)
-
-        app.add_endpoint('foo', endpoint)
-
-        self.assertTrue(endpoint.start.called)
 
     def test_add_existing_endpoint(self):
         """
@@ -145,6 +118,31 @@ class ApplicationTestCase(unittest.TestCase):
             mock_stop.side_effect = RuntimeError
 
             app.__del__()
+
+
+class ServerTestCase(unittest.TestCase):
+    """
+    Tests for ``server.Server``.
+    """
+
+    def make_app(self, **endpoints):
+        return server.Server(('localhost', 1234), endpoints)
+
+    def test_add_endpoint_start_app(self):
+        """
+        Ensure that endpoint.start() is called when adding an endpoint to an
+        already started applications.
+        """
+        endpoint = mock.Mock()
+        app = self.make_app()
+
+        app.start()
+
+        self.assertFalse(endpoint.start.called)
+
+        app.add_endpoint('foo', endpoint)
+
+        self.assertTrue(endpoint.start.called)
 
 
 class ConnectionTestCase(unittest.TestCase):
