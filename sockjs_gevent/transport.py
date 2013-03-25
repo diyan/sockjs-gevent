@@ -650,27 +650,5 @@ def get_transport_class(transport):
     return transport_types.get(transport, None)
 
 
-def waitany(events, timeout=None):
-    from gevent.event import AsyncResult
-
-    result = AsyncResult()
-    update = result.set
-
-    try:
-        for event in events:
-            if not event.started:
-                event.start()
-
-            if event.ready():
-                return event
-            else:
-                event.rawlink(update)
-
-        return result.get(timeout=timeout)
-    finally:
-        for event in events:
-            event.unlink(update)
-
-
 def get_transports(**kwargs):
     pass
