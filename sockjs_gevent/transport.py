@@ -5,7 +5,7 @@ import gevent
 from gevent import socket, select
 from geventwebsocket import WebSocketError, WebSocketHandler
 
-from . import protocol, session
+from . import protocol, session, util
 
 
 class TransportError(Exception):
@@ -23,12 +23,17 @@ class BaseTransport(object):
     :ivar streaming: Whether this is a streaming transport
     """
 
-    # the direction of the transport. Used in session locking
-    readable = False
-    writable = False
+    __slots__ = (
+        'session',
+        'handler',
+        'environ'
+    )
 
-    # whether this is a streaming transport
-    streaming = False
+    # the direction of the transport. Used in session locking
+    # readable means the endpoint can read messages from the session.
+    readable = False
+    # writable means that the endpoint can send message to the session.
+    writable = False
 
     # whether to cache the http response
     cache = False
@@ -45,7 +50,7 @@ class BaseTransport(object):
     # session
     timeout = 5.0
 
-    def __init__(self, stream, environ, session):
+    def __init__(self, session, handler, environ):
         """
         Constructor for the transport.
 
@@ -53,34 +58,32 @@ class BaseTransport(object):
         """
         self.session = session
         self.handler = handler
+        self.environ = environ
 
     @property
-    def is_socket(self):
-        return self.streaming and self.readable and self.writable
+    def socket(self):
+        return self.readable and self.writable
 
-    def handle_request(self, handler, raw_request_data):
-        raise NotImplementedError
-
-    def do_open(self, handler):
+    def do_open(self):
         """
         Encode and write the 'open' frame to the handler.
         """
         raise NotImplementedError
 
-    def write_close_frame(self, handler, code, reason):
+    def write_close_frame(self, code, reason):
         """
         Write a close frame to the handler.
         """
         frame = protocol.close_frame(code, reason)
-        handler.write(self.encode_frame(frame))
+        self.handler.write(self.encode_frame(frame))
 
-    def write_message_frame(self, handler, messages):
+    def write_message_frame(self, messages):
         if not messages:
             return
 
         frame = self.encode_frame(protocol.message_frame(*messages))
 
-        handler.write(frame)
+        self.handler.write(frame)
 
     def encode_frame(self, data):
         """
@@ -90,59 +93,83 @@ class BaseTransport(object):
         """
         return data
 
-    def prep_response(self, handler):
-        if self.cache:
-            handler.enable_cache()
-        else:
-            handler.disable_cache()
+    def get_headers(self):
+        """
+        Returns the headers for this transport
+        """
+        return util.get_headers(
+            self.environ,
+            content_type=self.content_type,
+            cookie=self.cookie,
+            cache=self.cache,
+            cors=self.cors
+        )
 
-        if self.cors:
-            handler.enable_cors()
+    def start_response(self, status='200 OK', extra_headers=None):
+        headers = self.get_headers()
 
-        if self.cookie:
-            handler.enable_cookie()
+        if extra_headers:
+            headers.extend(extra_headers)
 
-        if self.streaming:
-            handler.start_streaming()
+        self.handler.start_response(status, headers)
 
-    def finalize_request(self, handler):
+    def finalize_request(self):
         pass
 
-    def __call__(self, handler, raw_request_data):
+    def prepare_request(self):
+        pass
+
+    def handle(self):
         # ensure that the request has approached us with a valid REQUEST_METHOD
-        if handler.handle_options(*self.http_options):
+        if self.handler.handle_options(*self.http_options):
             return
 
-        self.prep_response(handler)
+        self.prepare_request()
 
-        if handler.status and not handler.status.startswith('200 '):
-            # prep_response set a custom status
+        if not self.acquire_session():
+            # something went wrong trying to lock the session.
             return
 
         try:
-            self.session.lock(self, self.readable, self.writable)
+            self.do_open()
 
             if self.session.new:
-                self.session.start()
+                self.session.open()
 
-                if not self.streaming:
-                    self.do_open(handler)
-
-                    return
-
-            if self.streaming:
-                self.do_open(handler)
-
-            self.handle_request(handler, raw_request_data)
-        except session.SessionUnavailable, e:
-            if not handler.status:
-                handler.start_response('200 OK')
-
-            self.write_close_frame(handler, e.code, e.reason)
+            self.process_request()
         finally:
-            self.session.unlock(self, self.readable, self.writable)
+            self.release_session()
 
-            self.finalize_request(handler)
+        self.finalize_request()
+
+    def handle_request(self):
+        """
+        Called to process the data for the request.
+
+        For readable transports, the messages will be decoded and added to the
+        session.
+
+        For writable transports, messages will be pulled from the session,
+        encoded and written to the transport.
+
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError
+
+    def acquire_session(self):
+        try:
+            self.session.lock(self, self.readable, self.writable)
+
+            return True
+        except session.SessionUnavailable, exc:
+            self.handler.start_response()
+
+            self.write_close_frame(exc.code, exc.reason)
+
+            return False
+
+    def release_session(self):
+        self.session.unlock(self, self.readable, self.writable)
 
     def send_heartbeat(self):
         raise NotImplementedError
@@ -151,69 +178,64 @@ class BaseTransport(object):
 class WritingOnlyTransport(BaseTransport):
     """
     Base functionality for a transport that only receives messages from the
-    client.
+    endpoint.
 
     Decodes the received messages and adds them to the session.
     """
 
+    __slots__ = ()
+
     writable = True
-    readable = False
-
-    streaming = False
-
-    cache = False
     cookie = True
 
-    def get_payload(self, handler, raw_request_data):
-        return raw_request_data
+    def get_payload(self):
+        return self.environ['wsgi.input'].read()
 
-    def handle_request(self, handler, raw_request_data):
-        payload = self.get_payload(handler, raw_request_data)
+    def process_request(self):
+        payload = self.get_payload()
 
         if not payload:
-            handler.do500('Payload expected.')
+            raise TransportError('Payload expected')
 
-            return
-
-        try:
-            messages = protocol.decode(payload)
-        except protocol.InvalidJSON:
-            handler.do500('Broken JSON encoding.')
-
-            return
+        messages = protocol.decode(payload)
 
         self.session.dispatch(*messages)
 
 
 class XHRSend(WritingOnlyTransport):
+    __slots__ = ()
+
     cors = True
     http_options = ['POST']
 
-    def finalize_request(self, handler):
-        if self.session.open:
-            handler.write_nothing()
+    def finalize_request(self):
+        if self.session.opened:
+            self.handler.write_nothing(headers=self.get_headers())
 
 
 class JSONPSend(WritingOnlyTransport):
+    __slots__ = ()
+
     cors = False
     http_options = ['POST']
 
-    def get_payload(self, handler, raw_request_data):
-        content_type = handler.environ.get('CONTENT_TYPE', 'text/plain')
+    def get_payload(self):
+        payload = super(JSONPSend, self).get_payload()
+        content_type = self.environ.get('CONTENT_TYPE', 'text/plain')
 
         if content_type == 'text/plain':
-            return raw_request_data
+            return payload
 
         if content_type == 'application/x-www-form-urlencoded':
             # Do we have a Payload?
-            qs = urlparse.parse_qs(raw_request_data)
+            qs = urlparse.parse_qs(payload)
 
             return qs.get('d', [None])[0]
 
-    def finalize_request(self, handler):
-        if self.session.open:
-            handler.start_response('200 OK')
-            handler.write('ok')
+    def finalize_request(self):
+        if self.session.opened:
+            self.start_response()
+            self.handler.write('ok')
 
 
 class SendingOnlyTransport(BaseTransport):
@@ -319,7 +341,6 @@ class JSONPolling(PollingTransport):
 
 
 class StreamingTransport(SendingOnlyTransport):
-    streaming = True
 
     # the minimum amount of text to produce before closing the response
     # according to sockjs-protocol, the response limit should be 128KiB
@@ -344,18 +365,18 @@ class StreamingTransport(SendingOnlyTransport):
 
                 break
 
-    def handle_request(self, handler, raw_request_data):
-        super(StreamingTransport, self).handle_request(handler, raw_request_data)
+    def process_request(self):
+        super(StreamingTransport, self).process_request()
 
         if self.session.closed:
-            self.write_close_frame(handler, *protocol.CONN_CLOSED)
+            self.write_close_frame(*protocol.CONN_CLOSED)
 
 
 class XHRStreaming(StreamingTransport):
     cors = True
     http_options = ['POST']
 
-    prelude = 'h' *  2049
+    prelude = 'h' * 2049
     content_type = "application/javascript"
 
     def encode_frame(self, data):
@@ -490,7 +511,7 @@ class RawWebSocket(BaseTransport):
         return self.websocket.receive()
 
     def put(self):
-        while self.session.open:
+        while self.session.opened:
             try:
                 message = self.recv_message()
             except WebSocketError:
@@ -515,7 +536,7 @@ class RawWebSocket(BaseTransport):
             raise ret.exception
 
     def finalize_request(self, handler):
-        if self.session.open:
+        if self.session.opened:
             self.session.close()
 
         if self.websocket:
@@ -578,7 +599,7 @@ class WebSocket(RawWebSocket):
         super(WebSocket, self).write_close_frame(handler, code, reason)
 
     def recv_message(self):
-        while self.session.open:
+        while self.session.opened:
             try:
                 return self.websocket.receive()
             except WebSocketError, e:
