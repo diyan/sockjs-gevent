@@ -396,7 +396,7 @@ class TransportTestCase(RequestHandlerTestCase):
 
         transport_cls.return_value = transport
 
-        transport.handle_request.side_effect = RuntimeError
+        transport.handle.side_effect = RuntimeError
         transport.get_headers.return_value = []
 
         with mock.patch.object(handler, 'internal_error') as internal_error:
@@ -406,7 +406,7 @@ class TransportTestCase(RequestHandlerTestCase):
             internal_error.assert_called_with(u'', headers=[])
 
         transport_cls.assert_called_with(session, handler, {})
-        transport.handle_request.assert_called_with()
+        transport.handle.assert_called_with()
         session.interrupt.assert_called_with()
 
     @mock.patch.object(transport, 'get_transport_class')
@@ -431,7 +431,7 @@ class TransportTestCase(RequestHandlerTestCase):
         transport = mock.Mock()
 
         transport_cls.return_value = transport
-        transport.handle_request.side_effect = socket.error
+        transport.handle.side_effect = socket.error
         transport.get_headers.return_value = []
 
         with mock.patch.object(handler, 'internal_error') as internal_error:
@@ -440,7 +440,7 @@ class TransportTestCase(RequestHandlerTestCase):
             internal_error.assert_called_with(u'', headers=[])
 
         transport_cls.assert_called_with(session, handler, {})
-        transport.handle_request.assert_called_with()
+        transport.handle.assert_called_with()
         session.interrupt.assert_called_with()
 
 

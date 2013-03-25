@@ -96,7 +96,7 @@ class RequestHandler(util.BaseHandler):
         transport_obj = transport_cls(session, self, self.environ)
 
         try:
-            transport_obj.handle_request()
+            transport_obj.handle()
         except Exception, exc:
             session.interrupt()
 
