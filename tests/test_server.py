@@ -75,7 +75,6 @@ class ApplicationTestCase(unittest.TestCase):
         self.assertIs(endpoint, app.endpoints['foo'])
         endpoint.bind_to_application.assert_called_with(app)
 
-
     def test_add_existing_endpoint(self):
         """
         Adding an endpoint with a name that already exists should raise a
@@ -225,8 +224,6 @@ class ConnectionTestCase(unittest.TestCase):
         conn.close()
 
 
-
-
 class EndpointTestCase(unittest.TestCase):
     """
     Tests for ``server.Endpoint``
@@ -347,11 +344,12 @@ class EndpointTestCase(unittest.TestCase):
         """
         sentinel = object()
         session = object()
+        handler = object()
         connection_class = mock.Mock()
         connection_class.return_value = sentinel
         endpoint = self.make_endpoint(connection_class=connection_class)
 
-        result = endpoint.make_connection(session)
+        result = endpoint.make_connection(handler, session)
 
         self.assertIs(sentinel, result)
         connection_class.assert_called_with(endpoint, session)
