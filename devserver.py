@@ -36,7 +36,7 @@ def devel_server():
     """
     A local server with code reload. Should only be used for development.
     """
-    from sockjs_gevent.transports import StreamingTransport
+    from sockjs_gevent.transport import StreamingTransport
 
     # set the response limit according to sockjs-protocol for the test server
     StreamingTransport.response_limit = 4224
