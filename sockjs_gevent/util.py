@@ -140,7 +140,7 @@ class BaseHandler(object):
 
         return writer
 
-    def handle_options(self, *allowed_methods):
+    def handle_options(self, *allowed_methods, **kwargs):
         method = self.environ['REQUEST_METHOD'].upper()
         allowed_methods = ['OPTIONS'] + list(allowed_methods)
 
@@ -152,9 +152,19 @@ class BaseHandler(object):
 
             return True
 
-        self.write_nothing(cache=True, cookie=True, cors=True, headers=[
+        headers = kwargs.pop('headers', None) or []
+
+        headers.append(
             ('Access-Control-Allow-Methods', ', '.join(allowed_methods))
-        ])
+        )
+
+        self.write_nothing(
+            cache=True,
+            cookie=True,
+            cors=True,
+            headers=headers,
+            **kwargs
+        )
 
         return True
 
