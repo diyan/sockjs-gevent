@@ -68,7 +68,7 @@ class BaseTransport(object):
         """
         Encode and write the 'open' frame to the handler.
         """
-        raise NotImplementedError
+        pass
 
     def write_close_frame(self, code, reason):
         """
@@ -136,7 +136,7 @@ class BaseTransport(object):
             if self.session.new:
                 self.session.open()
 
-            self.process_request()
+            self.handle_request()
         finally:
             self.release_session()
 
@@ -476,14 +476,10 @@ class WSHandler(WebSocketHandler):
 class RawWebSocket(BaseTransport):
     readable = True
     writable = True
-    streaming = True
 
     http_options = ['GET']
 
     websocket = None
-
-    def do_open(self, handler):
-        pass
 
     def send_messages(self, messages):
         for message in messages:

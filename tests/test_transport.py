@@ -147,3 +147,138 @@ class HandlerTestCase(unittest.TestCase):
 
         self.assertTrue(result)
         session.lock.assert_called_with(tport, readable, writable)
+
+    def test_handle_fail_acquire(self):
+        """
+        Ensure that if fail to acquire, the request is short circuited
+        """
+        from sockjs_gevent.session import SessionUnavailable
+
+        class MyTransport(transport.BaseTransport):
+            def do_open(self):
+                raise RuntimeError
+
+        handler = self.make_handler()
+        session = mock.Mock()
+        tport = self.make_transport(handler, session, klass=MyTransport)
+
+        session.lock.side_effect = SessionUnavailable(1234, 'DIE')
+
+        tport.handle()
+
+    def test_new_session(self):
+        """
+        A new session must call session.open
+        """
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                raise StopRequest
+
+        handler = self.make_handler()
+        session = mock.Mock()
+        tport = self.make_transport(handler, session, klass=MyTransport)
+
+        session.new = True
+
+        self.assertRaises(StopRequest, tport.handle)
+
+        session.open.assert_called_with()
+
+    def test_not_new_session(self):
+        """
+        If a session is not new, open must NOT be called.
+        """
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                raise StopRequest
+
+        handler = self.make_handler()
+        session = mock.Mock()
+        tport = self.make_transport(handler, session, klass=MyTransport)
+
+        session.new = False
+
+        self.assertRaises(StopRequest, tport.handle)
+
+        session.open.assert_not_called_with()
+
+    def test_release_session(self):
+        """
+        A session must be released after handling the request
+        """
+        handler = self.make_handler()
+        handler.released = False
+
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                pass
+
+            def release_session(self):
+                handler.released = True
+
+        tport = self.make_transport(handler, klass=MyTransport)
+
+        tport.handle()
+
+        self.assertTrue(handler.released)
+
+    def test_release_session_on_error(self):
+        """
+        A session must be released after handling the request
+        """
+        handler = self.make_handler()
+        handler.released = False
+
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                raise RuntimeError
+
+            def release_session(self):
+                handler.released = True
+
+        tport = self.make_transport(handler, klass=MyTransport)
+
+        self.assertRaises(RuntimeError, tport.handle)
+
+        self.assertTrue(handler.released)
+
+    def test_finalise_request(self):
+        """
+        Ensure that if there are no errors, finalize_request is called.
+        """
+        handler = self.make_handler()
+        handler.finalized = False
+
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                pass
+
+            def finalize_request(self):
+                handler.finalized = True
+
+        tport = self.make_transport(handler, klass=MyTransport)
+
+        tport.handle()
+
+        self.assertTrue(handler.finalized)
+
+    def test_finalise_request_with_error(self):
+        """
+        If ``handle_request`` dies with an exception, ``finalize_request`` must
+        NOT be called.
+        """
+        handler = self.make_handler()
+        handler.finalized = False
+
+        class MyTransport(transport.BaseTransport):
+            def handle_request(self):
+                raise RuntimeError
+
+            def finalize_request(self):
+                handler.finalized = True
+
+        tport = self.make_transport(handler, klass=MyTransport)
+
+        self.assertRaises(RuntimeError, tport.handle)
+
+        self.assertFalse(handler.finalized)
