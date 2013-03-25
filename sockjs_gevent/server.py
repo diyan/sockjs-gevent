@@ -175,6 +175,15 @@ class Connection(object):
         finally:
             self.endpoint = None
 
+    def session_closed(self):
+        if not self.session:
+            return
+
+        try:
+            self.on_close()
+        finally:
+            self.close()
+
 
 class Endpoint(object):
     """
@@ -263,7 +272,7 @@ class Endpoint(object):
             for label in transport.get_transports(cors=True):
                 self.disabled_transports.append(label)
 
-    def make_connection(self, session):
+    def make_connection(self, handler, session):
         return self.connection_class(self, session)
 
     def transport_allowed(self, transport):
@@ -365,10 +374,15 @@ class Endpoint(object):
             'server_heartbeat_interval': self.heartbeat_interval
         }
 
+    def connection_closed(self, connection):
+        pass
+
 
 class Server(pywsgi.WSGIServer, Application):
     """
     """
+
+    application = None
 
     def __init__(self, listener, endpoints=None, options=None, **kwargs):
         kwargs.setdefault('handler_class', handler.Handler)
