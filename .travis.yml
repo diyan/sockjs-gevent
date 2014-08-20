@@ -2,7 +2,7 @@ language: python
 
 before_install:
  - sudo apt-get update -qq
- - sudo apt-get install -qq libevent-dev libev-dev git-core
+ - sudo apt-get install -qq git-core
 
 python:
   - "2.6"
@@ -15,7 +15,6 @@ install:
 
 before_script:
   - git clone git://github.com/sockjs/sockjs-protocol.git sockjs_protocol
-  - pip install unittest2 websocket-client==0.4.1 ws4py --use-mirrors
 
 script:
   - nosetests
