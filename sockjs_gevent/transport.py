@@ -3,7 +3,8 @@ from socket import error as sock_err
 
 import gevent
 from gevent import socket, select
-from geventwebsocket import WebSocketError, WebSocketHandler
+from geventwebsocket import WebSocketError
+from geventwebsocket.handler import WebSocketHandler
 
 from . import protocol, session, util
 
